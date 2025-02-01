@@ -14,7 +14,70 @@ use std::str;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 // use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
-use serde_json::to_writer_pretty;
+use serde_json::{to_writer_pretty, Map, Number, Value};
+
+trait IntoNumber {
+    fn into_number(self) -> Number;
+}
+
+impl IntoNumber for u16 {
+    fn into_number(self) -> Number {
+        Number::from(self)
+    }
+}
+
+impl IntoNumber for u8 {
+    fn into_number(self) -> Number {
+        Number::from(self)
+    }
+}
+
+impl IntoNumber for f64 {
+    fn into_number(self) -> Number {
+        Number::from_f64(self).unwrap()
+    }
+}
+
+trait IntoValue {
+    fn into_value(self) -> Value;
+}
+
+impl IntoValue for u16 {
+    fn into_value(self) -> Value {
+        Value::Number(Number::from(self))
+    }
+}
+
+impl IntoValue for u32 {
+    fn into_value(self) -> Value {
+        Value::Number(Number::from(self))
+    }
+}
+
+impl<T> IntoValue for Vec<T>
+where
+    T: IntoValue,
+{
+    fn into_value(self) -> Value {
+        Value::Array(self.into_iter().map(|item| item.into_value()).collect())
+    }
+}
+
+struct BankItem {
+    item_id: u16,
+    quantity: u32,
+    text_id: String,
+}
+
+impl IntoValue for BankItem {
+    fn into_value(self) -> Value {
+        let mut map = Map::new();
+        map.insert("item_id".to_string(), self.item_id.into_value());
+        map.insert("quantity".to_string(), self.quantity.into_value());
+        map.insert("text_id".to_string(), self.text_id.into());
+        Value::Object(map)
+    }
+}
 
 fn main() {
     let skill = match std::env::args().nth(1) {
@@ -189,6 +252,7 @@ impl BinaryReader {
 struct MelvorSaveReader {
     header: BinaryReader,
     raw_data: BinaryReader,
+    save_map: HashMap<String, Value>,
 }
 
 impl MelvorSaveReader {
@@ -216,6 +280,7 @@ impl MelvorSaveReader {
         let mut save_reader = MelvorSaveReader {
             header: header,
             raw_data: raw_data,
+            save_map: HashMap::new(),
         };
 
         let header_map = save_reader.read_header_map();
@@ -243,75 +308,58 @@ impl MelvorSaveReader {
         let header_version = save_reader.header.read_uint32();
         println!("Header version: {}", header_version);
 
-        let tick_timestamp = save_reader.raw_data.read_float64();
-        println!("Tick timestamp: {}", tick_timestamp);
-
-        let save_timestamp = save_reader.raw_data.read_float64();
-        println!("Save timestamp: {}", save_timestamp);
+        save_reader.add_to_save_map_f64("tick_timestamp");
+        save_reader.add_to_save_map_f64("save_timestamp");
 
         if save_reader.raw_data.read_bool() {
-            let active_action_id = save_reader.raw_data.read_uint16();
-            println!(
-                "Active action id: {}, {}",
-                active_action_id,
-                numeric_to_string_id_map.get(&active_action_id).unwrap()
-            );
+            save_reader.add_to_save_map_uint16("active_action_id");
         }
 
         if save_reader.raw_data.read_bool() {
-            let paused_action_id = save_reader.raw_data.read_uint16();
-            println!(
-                "Paused action id: {}, {}",
-                paused_action_id,
-                numeric_to_string_id_map.get(&paused_action_id).unwrap()
-            );
+            save_reader.add_to_save_map_uint16("paused_action_id");
         }
 
-        let is_paused = save_reader.raw_data.read_bool();
-        println!("Is paused: {}", is_paused);
-
-        let merchants_permit_read = save_reader.raw_data.read_bool();
-        println!("Merchants permit read: {}", merchants_permit_read);
-
-        let game_mode = save_reader.raw_data.read_uint16();
-        println!(
-            "Game mode: {}, {}",
-            game_mode,
-            numeric_to_string_id_map.get(&game_mode).unwrap()
-        );
-
-        let character_name = save_reader.raw_data.read_string();
-        println!("Character name: {}", character_name);
+        save_reader.add_to_save_map_bool("is_paused");
+        save_reader.add_to_save_map_bool("merchants_permit_read");
+        save_reader.add_to_save_map_uint16("game_mode_id");
+        save_reader.add_to_save_map_string("character_name");
 
         // Bank
         // Items that are in your bank and are locked so you can't sell them etc.
-        let locked_items = save_reader.raw_data.read_set(|r| r.read_uint16());
-        for item_id in locked_items.iter() {
-            println!(
-                "Locked item id: {}, {}",
-                item_id,
-                numeric_to_string_id_map.get(item_id).unwrap()
-            );
-        }
+        save_reader
+            .add_to_save_map_set("bank.locked_items", |r| r.read_uint16());
 
-        let items_by_tab = save_reader.raw_data.read_vector(|reader| {
-            reader.read_vector(|reader| {
-                let item = reader.read_uint16();
-                let quantity = reader.read_uint32();
-                (item, quantity)
+        save_reader.add_to_save_map_vector("bank.items_by_bank_tab", |r| {
+            r.read_vector(|r| {
+                let item_id = r.read_uint16();
+                BankItem {
+                    item_id: item_id,
+                    quantity: r.read_uint32(),
+                    text_id: match numeric_to_string_id_map.get(&item_id) {
+                        Some(text_id) => text_id.to_string(),
+                        None => "".to_string(),
+                    },
+                }
             })
         });
-        for (tab_index, tab) in items_by_tab.iter().enumerate() {
-            for (item_id, quantity) in tab.iter() {
-                println!(
-                    "Tab: {}, Item: {}, {}, Quantity: {}",
-                    tab_index,
-                    item_id,
-                    numeric_to_string_id_map.get(item_id).unwrap(),
-                    quantity
-                );
-            }
-        }
+        // let items_by_tab = save_reader.raw_data.read_vector(|reader| {
+        //     reader.read_vector(|reader| {
+        //         let item = reader.read_uint16();
+        //         let quantity = reader.read_uint32();
+        //         (item, quantity)
+        //     })
+        // });
+        // for (tab_index, tab) in items_by_tab.iter().enumerate() {
+        //     for (item_id, quantity) in tab.iter() {
+        //         println!(
+        //             "Tab: {}, Item: {}, {}, Quantity: {}",
+        //             tab_index,
+        //             item_id,
+        //             numeric_to_string_id_map.get(item_id).unwrap(),
+        //             quantity
+        //         );
+        //     }
+        // }
 
         let default_item_tabs = save_reader
             .raw_data
@@ -357,7 +405,7 @@ impl MelvorSaveReader {
             );
         }
 
-
+        write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
         return Some(save_reader);
     }
@@ -387,6 +435,61 @@ impl MelvorSaveReader {
         }
 
         map
+    }
+
+    fn add_to_save_map_f64(&mut self, key: &str) {
+        self.save_map.insert(
+            key.to_string(),
+            Value::Number(
+                Number::from_f64(self.raw_data.read_float64()).unwrap(),
+            ),
+        );
+    }
+
+    fn add_to_save_map_uint16(&mut self, key: &str) {
+        self.save_map.insert(
+            key.to_string(),
+            Value::Number(Number::from(self.raw_data.read_uint16())),
+        );
+    }
+
+    fn add_to_save_map_bool(&mut self, key: &str) {
+        self.save_map
+            .insert(key.to_string(), Value::Bool(self.raw_data.read_bool()));
+    }
+
+    fn add_to_save_map_string(&mut self, key: &str) {
+        self.save_map.insert(
+            key.to_string(),
+            Value::String(self.raw_data.read_string()),
+        );
+    }
+
+    fn add_to_save_map_set<T, F>(&mut self, key: &str, read_value: F)
+    where
+        T: IntoNumber,
+        F: Fn(&mut BinaryReader) -> T,
+    {
+        self.save_map.insert(
+            key.to_string(),
+            Value::Array(
+                self.raw_data
+                    .read_set(|r| Value::Number(read_value(r).into_number())),
+            ),
+        );
+    }
+
+    fn add_to_save_map_vector<T, F>(&mut self, key: &str, read_value: F)
+    where
+        T: IntoValue,
+        F: Fn(&mut BinaryReader) -> T,
+    {
+        self.save_map.insert(
+            key.to_string(),
+            Value::Array(
+                self.raw_data.read_vector(|r| read_value(r).into_value()),
+            ),
+        );
     }
 }
 
