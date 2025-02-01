@@ -68,6 +68,13 @@ impl BinaryReader {
         uint16
     }
 
+    fn read_uint8(&mut self) -> u8 {
+        let buffer = self.read_buffer_of_size(1);
+        let uint8 = buffer[0];
+
+        uint8
+    }
+
     fn read_string(&mut self) -> String {
         let string_length = self.read_uint32();
         // println!("String length: {}", string_length);
@@ -112,12 +119,15 @@ impl BinaryReader {
         boolean
     }
 
-    fn read_set(&mut self) -> Vec<u16> {
+    fn read_set<T, F>(&mut self, read_value: F) -> Vec<T>
+    where
+        F: Fn(&mut Self) -> T,
+    {
         let set_size = self.read_uint32();
 
         let mut set = Vec::new();
         for _ in 0..set_size {
-            let value = self.read_uint16();
+            let value = read_value(self);
             set.push(value);
         }
 
@@ -137,6 +147,29 @@ impl BinaryReader {
         }
 
         vector
+    }
+
+    fn read_map<K, V, F, G>(
+        &mut self,
+        read_key: F,
+        read_value: G,
+    ) -> HashMap<K, V>
+    where
+        F: Fn(&mut Self) -> K,
+        G: Fn(&mut Self) -> V,
+        K: Eq,
+        K: std::hash::Hash,
+    {
+        let map_size = self.read_uint32();
+
+        let mut map = HashMap::new();
+        for _ in 0..map_size {
+            let key = read_key(self);
+            let value = read_value(self);
+            map.insert(key, value);
+        }
+
+        map
     }
 
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -252,7 +285,7 @@ impl MelvorSaveReader {
 
         // Bank
         // Items that are in your bank and are locked so you can't sell them etc.
-        let locked_items = save_reader.raw_data.read_set();
+        let locked_items = save_reader.raw_data.read_set(|r| r.read_uint16());
         for item_id in locked_items.iter() {
             println!(
                 "Locked item id: {}, {}",
@@ -279,6 +312,52 @@ impl MelvorSaveReader {
                 );
             }
         }
+
+        let default_item_tabs = save_reader
+            .raw_data
+            .read_map(|r| r.read_uint16(), |r| r.read_uint8());
+        for (tab_index, tab) in default_item_tabs.iter() {
+            println!(
+                "Default item tab: {}, {}, {}",
+                tab_index,
+                numeric_to_string_id_map.get(tab_index).unwrap(),
+                tab
+            );
+        }
+
+        let custom_sort_order =
+            save_reader.raw_data.read_vector(|r| r.read_uint16());
+        for (index, item_id) in custom_sort_order.iter().enumerate() {
+            println!(
+                "Custom sort order: {}, {}, {}",
+                index,
+                item_id,
+                numeric_to_string_id_map.get(item_id).unwrap()
+            );
+        }
+
+        let glowing_items = save_reader.raw_data.read_set(|r| r.read_uint16());
+        for item_id in glowing_items.iter() {
+            println!(
+                "Glowing item: {}, {}",
+                item_id,
+                numeric_to_string_id_map.get(item_id).unwrap()
+            );
+        }
+
+        let tab_icons = save_reader
+            .raw_data
+            .read_map(|r| r.read_uint8(), |r| r.read_uint16());
+        for (tab_index, icon_id) in tab_icons.iter() {
+            println!(
+                "Tab icon: {}, {}, {}",
+                tab_index,
+                icon_id,
+                numeric_to_string_id_map.get(icon_id).unwrap()
+            );
+        }
+
+
 
         return Some(save_reader);
     }
