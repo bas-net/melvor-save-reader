@@ -1,0 +1,74 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"command": "build",
+			"group": "build",
+			"label": "cargo build",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
+		{
+			"command": "test",
+			"group": {
+				"isDefault": true,
+				"kind": "test"
+			},
+			"label": ": Test rusty_melvor",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
+		{
+			"args": [
+				"--release"
+			],
+			"command": "build",
+			"group": {
+				"kind": "build"
+			},
+			"label": ": Build release",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
+		{
+			"command": "./target/release/rusty_melvor",
+			"group": {
+				"kind": "none"
+			},
+			"label": ": Run release",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "shell"
+		},
+		{
+			"command": "clippy",
+			"label": ": Run cargo clippy",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
+	]
+}

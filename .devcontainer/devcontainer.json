@@ -1,0 +1,13 @@
+{
+	"name": "Rusty Melvor",
+	"image": "mcr.microsoft.com/devcontainers/rust:1-1-bullseye",
+	"postCreateCommand": "bash ./.devcontainer/postcreate.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"vadimcn.vscode-lldb",
+				"rust-lang.rust-analyzer"
+			]
+		}
+	}
+}
