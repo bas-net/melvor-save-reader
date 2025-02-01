@@ -2,10 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Rust",
+            "name": "Debug: Rusty Melvor Summoning",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/rusty_melvor/target/debug/rusty_melvor",
+            "args": [
+                "summoning"
+            ],
             "cwd": "${workspaceFolder}/rusty_melvor",
             "preLaunchTask": "cargo build",
             "stopOnEntry": false,
