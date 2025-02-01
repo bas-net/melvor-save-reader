@@ -2,3 +2,7 @@
 name = "rusty_melvor"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+base64 = "0.22.1"
+flate2 = "1.0.35"
