@@ -4,3 +4,8 @@ rusty_melvor/output.txt
 re/game.js
 re/save.js
 re/saveWriter.js
+re/bank.js
+re/gamefull.js
+re/namespaceregistry.js
+rusty_melvor/header_map.json
+rusty_melvor/numeric_to_string_id_map.json

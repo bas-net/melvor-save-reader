@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 base64 = "0.22.1"
 flate2 = "1.0.35"
+serde = "1.0.217"
+serde_json = "1.0.138"

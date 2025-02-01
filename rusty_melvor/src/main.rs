@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Binary;
+use std::fs::File;
 // use core::str;
 // use std::fs::File;
 use std::io::{
     // self,
-    Read,
-    //  Write
+    self,
+    Read, //  Write
 };
 use std::str;
 
@@ -13,6 +14,7 @@ use std::str;
 // use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
 // use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
+use serde_json::to_writer_pretty;
 
 fn main() {
     let skill = match std::env::args().nth(1) {
@@ -59,7 +61,7 @@ impl BinaryReader {
         uint32
     }
 
-    fn read_uing16(&mut self) -> u16 {
+    fn read_uint16(&mut self) -> u16 {
         let buffer = self.read_buffer_of_size(2);
         let uint16 = u16::from_be_bytes([buffer[0], buffer[1]]);
 
@@ -91,6 +93,50 @@ impl BinaryReader {
         let buffer = self.read_buffer_of_size(buffer_length as usize);
 
         buffer
+    }
+
+    fn read_float64(&mut self) -> f64 {
+        let buffer = self.read_buffer_of_size(8);
+        let float64 = f64::from_be_bytes([
+            buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5],
+            buffer[6], buffer[7],
+        ]);
+
+        float64
+    }
+
+    fn read_bool(&mut self) -> bool {
+        let buffer = self.read_buffer_of_size(1);
+        let boolean = buffer[0] == 1;
+
+        boolean
+    }
+
+    fn read_set(&mut self) -> Vec<u16> {
+        let set_size = self.read_uint32();
+
+        let mut set = Vec::new();
+        for _ in 0..set_size {
+            let value = self.read_uint16();
+            set.push(value);
+        }
+
+        set
+    }
+
+    fn read_vector<T, F>(&mut self, read_value: F) -> Vec<T>
+    where
+        F: Fn(&mut Self) -> T,
+    {
+        let vector_size = self.read_uint32();
+
+        let mut vector = Vec::new();
+        for _ in 0..vector_size {
+            let value = read_value(self);
+            vector.push(value);
+        }
+
+        vector
     }
 
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -140,10 +186,97 @@ impl MelvorSaveReader {
         };
 
         let header_map = save_reader.read_header_map();
-        for (key, value) in header_map.iter() {
-            println!("Key: {}", key);
-            for (sub_key, sub_value) in value.iter() {
-                println!("Sub Key: {}, Sub Value: {}", sub_key, sub_value);
+        // for (key, value) in header_map.iter() {
+        //     println!("Key: {}", key);
+        //     for (sub_key, sub_value) in value.iter() {
+        //         println!("Sub Key: {}, Sub Value: {}", sub_key, sub_value);
+        //     }
+        // }
+        write_hashmap_to_json(&header_map, "header_map.json").unwrap();
+
+        let mut numeric_to_string_id_map = HashMap::new();
+        for (namespace, value) in header_map.iter() {
+            for (id, sub_value) in value.iter() {
+                numeric_to_string_id_map
+                    .insert(*sub_value, format!("{}:{}", namespace, id));
+            }
+        }
+        write_hashmap_to_json(
+            &numeric_to_string_id_map,
+            "numeric_to_string_id_map.json",
+        )
+        .unwrap();
+
+        let header_version = save_reader.header.read_uint32();
+        println!("Header version: {}", header_version);
+
+        let tick_timestamp = save_reader.raw_data.read_float64();
+        println!("Tick timestamp: {}", tick_timestamp);
+
+        let save_timestamp = save_reader.raw_data.read_float64();
+        println!("Save timestamp: {}", save_timestamp);
+
+        if save_reader.raw_data.read_bool() {
+            let active_action_id = save_reader.raw_data.read_uint16();
+            println!(
+                "Active action id: {}, {}",
+                active_action_id,
+                numeric_to_string_id_map.get(&active_action_id).unwrap()
+            );
+        }
+
+        if save_reader.raw_data.read_bool() {
+            let paused_action_id = save_reader.raw_data.read_uint16();
+            println!(
+                "Paused action id: {}, {}",
+                paused_action_id,
+                numeric_to_string_id_map.get(&paused_action_id).unwrap()
+            );
+        }
+
+        let is_paused = save_reader.raw_data.read_bool();
+        println!("Is paused: {}", is_paused);
+
+        let merchants_permit_read = save_reader.raw_data.read_bool();
+        println!("Merchants permit read: {}", merchants_permit_read);
+
+        let game_mode = save_reader.raw_data.read_uint16();
+        println!(
+            "Game mode: {}, {}",
+            game_mode,
+            numeric_to_string_id_map.get(&game_mode).unwrap()
+        );
+
+        let character_name = save_reader.raw_data.read_string();
+        println!("Character name: {}", character_name);
+
+        // Bank
+        // Items that are in your bank and are locked so you can't sell them etc.
+        let locked_items = save_reader.raw_data.read_set();
+        for item_id in locked_items.iter() {
+            println!(
+                "Locked item id: {}, {}",
+                item_id,
+                numeric_to_string_id_map.get(item_id).unwrap()
+            );
+        }
+
+        let items_by_tab = save_reader.raw_data.read_vector(|reader| {
+            reader.read_vector(|reader| {
+                let item = reader.read_uint16();
+                let quantity = reader.read_uint32();
+                (item, quantity)
+            })
+        });
+        for (tab_index, tab) in items_by_tab.iter().enumerate() {
+            for (item_id, quantity) in tab.iter() {
+                println!(
+                    "Tab: {}, Item: {}, {}, Quantity: {}",
+                    tab_index,
+                    item_id,
+                    numeric_to_string_id_map.get(item_id).unwrap(),
+                    quantity
+                );
             }
         }
 
@@ -167,7 +300,7 @@ impl MelvorSaveReader {
             for _ in 0..sub_map_size {
                 let sub_key = self.header.read_string();
                 // println!("  Sub Key: {}", sub_key);
-                let sub_value = self.header.read_uing16();
+                let sub_value = self.header.read_uint16();
                 // println!("  Sub Value: {}", sub_value);
                 sub_map.insert(sub_key, sub_value);
             }
@@ -209,145 +342,16 @@ fn open_save() -> Option<()> {
         }
     }
 
-    MelvorSaveReader::read_save(save.clone());
-
-    // write_output_to_file(&save).unwrap_or(());
-
-    // let mut byte_offset = 0;
-
-    // let melvor = match str::from_utf8(&save[byte_offset..byte_offset + 6]) {
-    //     Ok(melvor) => melvor,
-    //     Err(e) => {
-    //         println!("Failed to decode save: {}", e);
-    //         return None;
-    //     }
-    // };
-    // byte_offset += 6;
-
-    // let header_length = u32::from_be_bytes([
-    //     save[byte_offset],
-    //     save[byte_offset + 1],
-    //     save[byte_offset + 2],
-    //     save[byte_offset + 3],
-    // ]);
-    // byte_offset += 4;
-
-    // let header_data =
-    //     save[byte_offset..byte_offset + header_length as usize].to_vec();
-    // byte_offset += header_length as usize;
-
-    // let mut header_offset = 0;
-    // // Map size
-    // let header_map_size = u32::from_be_bytes([
-    //     header_data[header_offset],
-    //     header_data[header_offset + 1],
-    //     header_data[header_offset + 2],
-    //     header_data[header_offset + 3],
-    // ]);
-    // header_offset += 4;
-
-    // println!("Map size: {}", header_map_size);
-    // // let mut header_map: HashMap<&str, _> = HashMap::<&str, _>::new();
-    // for i in 0..header_map_size {
-    //     // Map key
-    //     // Get string length
-    //     let map_key_length = u32::from_be_bytes([
-    //         header_data[header_offset],
-    //         header_data[header_offset + 1],
-    //         header_data[header_offset + 2],
-    //         header_data[header_offset + 3],
-    //     ]);
-    //     header_offset += 4;
-
-    //     let map_key = match str::from_utf8(
-    //         &header_data
-    //             [header_offset..header_offset + map_key_length as usize],
-    //     ) {
-    //         Ok(map_key) => map_key,
-    //         Err(e) => {
-    //             println!("Failed to decode map key: {}", e);
-    //             return None;
-    //         }
-    //     };
-    //     header_offset += map_key_length as usize;
-
-    //     // Map value
-    //     // ValueKey
-    //     let value_key_length = u32::from_be_bytes([
-    //         header_data[header_offset],
-    //         header_data[header_offset + 1],
-    //         header_data[header_offset + 2],
-    //         header_data[header_offset + 3],
-    //     ]);
-    //     header_offset += 4;
-
-    //     let value_key_header = match str::from_utf8(
-    //         &header_data
-    //             [header_offset..header_offset + value_key_length as usize],
-    //     ) {
-    //         Ok(value_key_header) => value_key_header,
-    //         Err(e) => {
-    //             println!("Failed to decode value key header: {}", e);
-    //             return None;
-    //         }
-    //     };
-
-    //     println!("Map key: {}", map_key);
-    //     break;
-    // }
-
-    // let save_data = save[byte_offset..].to_vec();
-
-    // let uint32_header = u32::from_be_bytes([
-    //     save[byte_offset],
-    //     save[byte_offset + 1],
-    //     save[byte_offset + 2],
-    //     save[byte_offset + 3],
-    // ]);
-    // byte_offset += 4;
-
-    // let uint32_savewriter = u32::from_be_bytes([
-    //     save[byte_offset],
-    //     save[byte_offset + 1],
-    //     save[byte_offset + 2],
-    //     save[byte_offset + 3],
-    // ]);
-    // byte_offset += 4;
-
-    // println!("Melvor: {}", melvor);
-    // println!("Header: {}", header_length);
-    // println!("Savewriter: {}", uint32_savewriter);
-
-    // println!("{}", save);
+    let save_reader = MelvorSaveReader::read_save(save.clone());
 
     Some(())
 }
 
-// fn write_output_to_file(data: &[u8]) -> io::Result<()> {
-//     let mut file = File::create("output.txt")?;
-//     let mut i = 0;
-//     while i < data.len() {
-//         match str::from_utf8(&data[i..]) {
-//             Ok(valid_str) => {
-//                 writeln!(file, "Valid UTF-8: {}", valid_str)?;
-//                 break;
-//             }
-//             Err(e) => {
-//                 let valid_up_to = e.valid_up_to();
-//                 if valid_up_to > 0 {
-//                     writeln!(
-//                         file,
-//                         "Valid UTF-8: {}",
-//                         str::from_utf8(&data[i..i + valid_up_to])
-//                             .unwrap()
-//                             .to_string()
-//                     )?;
-//                     i += valid_up_to;
-//                 }
-//                 writeln!(file, "Invalid UTF-8: {:02x}", data[i])?;
-//                 i += 1;
-//             }
-//         }
-//     }
-//     Ok(())
-// }
+fn write_hashmap_to_json<K: serde::Serialize, V: serde::Serialize>(
+    map: &HashMap<K, V>,
+    filename: &str,
+) -> io::Result<()> {
+    let file = File::create(filename)?;
+    to_writer_pretty(file, map)?;
+    Ok(())
+}
