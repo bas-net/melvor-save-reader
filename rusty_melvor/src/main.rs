@@ -63,7 +63,7 @@ where
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(PartialEq, Hash)]
 struct NamespacedObject {
     id: u16,
     text_id: Option<String>,
@@ -94,6 +94,23 @@ impl IntoValue for BankItem {
         map.insert("item".into(), self.item.into());
         map.insert("quantity".into(), self.quantity.into());
         Value::Object(map)
+    }
+}
+
+trait AutoInto {
+    fn auto_insert<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<String>,
+        V: Into<Value>;
+}
+
+impl AutoInto for Map<String, Value> {
+    fn auto_insert<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<String>,
+        V: Into<Value>,
+    {
+        self.insert(key.into(), value.into());
     }
 }
 
@@ -896,13 +913,77 @@ impl MelvorSaveReader {
 
                 map.insert("task_timer".into(), read_timer(r));
 
-                map.insert("realm".into(), r.get_save_map_namedspaced_object().into());
+                map.insert(
+                    "realm".into(),
+                    r.get_save_map_namedspaced_object().into(),
+                );
 
                 map.into()
             });
 
+            if r.read_bool() {
+                map.insert(
+                    "active_event".into(),
+                    r.get_save_map_namedspaced_object().into(),
+                );
+            }
+
+            map.insert(
+                "event_passives".into(),
+                r.read_vector(|r| -> Value {
+                    r.get_save_map_namedspaced_object().into()
+                })
+                .into(),
+            );
+
+            map.auto_insert(
+                "event_passives_being_selected",
+                r.read_set(|r| r.get_save_map_namedspaced_object()),
+            );
+
+            map.auto_insert("event_dungon_length", r.read_uint32());
+
+            map.auto_insert(
+                "active_event_areas",
+                r.read_value_map_key(
+                    |r| match r.get_save_map_namedspaced_object() {
+                        NamespacedObject {
+                            text_id: Some(text_id),
+                            ..
+                        } => text_id,
+                        NamespacedObject { id, .. } => id.to_string(),
+                    },
+                    |r, _| r.read_uint32().into(),
+                ),
+            );
+
+            map.auto_insert("event_progress", r.read_uint32());
+
+            map.auto_insert(
+                "dungeon_completion",
+                r.read_value_map_key(
+                    |r| match r.get_save_map_namedspaced_object() {
+                        NamespacedObject {
+                            text_id: Some(text_id),
+                            ..
+                        } => text_id,
+                        NamespacedObject { id, .. } => id.to_string(),
+                    },
+                    |r, _| r.read_uint32().into(),
+                ),
+            );
+
+            map.auto_insert("stronghold_tier", r.read_uint8());
+
             map
         });
+
+        // raid_manager
+        // raid_manager.base_manager
+        // raid_manager.base_manager.player
+        // raid_manager.base_manager.player.character
+        // raid_manager.base_manager.enemy
+        // raid_manager.base_manager.enemy.character
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
