@@ -14,11 +14,20 @@ pub trait BaseManagerDecoder: DataReaders + TimerDecoder {
         map.insert("player".into(), call_decode_player(r));
         map.insert("enemy".into(), call_decode_enemy(r));
 
+        // if map
+        //     .get("player")
+        //     .unwrap()
+        //     .as_object()
+        //     .unwrap()
+        //     .get("player")
+        //     .is_none()
+        // {
         map.insert("fight_in_progress".into(), r.read_bool().into());
         map.insert("spawn_timer".into(), r.decode_timer());
         map.insert("is_active".into(), r.read_bool().into());
 
         // decode passives
+
         map.insert(
             "passives".into(),
             r.read_vector(|r| -> Value {
@@ -30,6 +39,7 @@ pub trait BaseManagerDecoder: DataReaders + TimerDecoder {
             })
             .into(),
         );
+        // }
 
         map.into()
     }

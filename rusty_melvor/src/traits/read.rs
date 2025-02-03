@@ -5,6 +5,9 @@ use crate::NamespacedObject;
 pub trait ByteOffset {
     fn get_byte_offset(&self) -> usize;
     fn increment_byte_offset(&mut self, increment: usize);
+
+    fn print_previous_bytes(&self, size: usize);
+    fn print_next_bytes(&self, size: usize);
 }
 
 pub trait Buffer {
@@ -29,6 +32,8 @@ pub trait BufferReader: Buffer + ByteOffset {
     fn skip(&mut self, size: usize) {
         self.increment_byte_offset(size);
     }
+
+
 }
 
 pub trait DataReaders: BufferReader + HasNumericToStringIdMap {

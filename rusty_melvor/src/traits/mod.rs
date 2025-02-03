@@ -8,3 +8,4 @@ pub mod enemy_decoder;
 pub mod raid_enemy_decoder;
 pub mod raid_manager_decoder;
 pub mod bank_decoder;
+pub mod minibar_decoder;

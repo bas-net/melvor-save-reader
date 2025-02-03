@@ -19,6 +19,7 @@ use traits::bank_decoder::BankDecoder;
 use traits::base_manager_decoder::BaseManagerDecoder;
 use traits::character_decoder::CharacterDecoder;
 use traits::enemy_decoder::EnemyDecoder;
+use traits::minibar_decoder::MinibarDecoder;
 use traits::player_decoder::PlayerDecoder;
 use traits::raid_enemy_decoder::RaidEnemyDecoder;
 use traits::raid_manager_decoder::RaidManagerDecoder;
@@ -115,6 +116,11 @@ struct BinaryReader {
 
 impl Buffer for BinaryReader {
     fn get_slice(&mut self, start: usize, end: usize) -> Vec<u8> {
+        if end > self.data.len() {
+            println!("Request too long!");
+            // return vec of length end-start
+            return vec![0; end - start];
+        }
         self.data[start..end].to_vec()
     }
 }
@@ -127,6 +133,28 @@ impl ByteOffset for BinaryReader {
     fn increment_byte_offset(&mut self, increment: usize) {
         self.byte_offset += increment;
         // println!("Byte offset: {}", self.byte_offset);
+    }
+
+    fn print_next_bytes(&self, size: usize) {
+        for byte in &self.data[self.byte_offset..self.byte_offset + size] {
+            match String::from_utf8(vec![*byte]) {
+                Ok(c) => print!("{:02x}-{} ", byte, c),
+                Err(_) => print!("{:02x} ", byte),
+            }
+            // print!("{:02x} ", byte);
+        }
+        println!();
+    }
+
+    fn print_previous_bytes(&self, size: usize) {
+        for byte in &self.data[(self.byte_offset - size)..self.byte_offset] {
+            match String::from_utf8(vec![*byte]) {
+                Ok(c) => print!("{:02x}-{} ", byte, c),
+                Err(_) => print!("{:02x} ", byte),
+            }
+            // print!("{:02x} ", byte);
+        }
+        println!();
     }
 }
 
@@ -152,6 +180,7 @@ impl RaidEnemyDecoder for BinaryReader {}
 impl RaidManagerDecoder for BinaryReader {}
 
 impl BankDecoder for BinaryReader {}
+impl MinibarDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -252,7 +281,10 @@ impl MelvorSaveReader {
         save_reader.add_to_save_map("bank", |r| r.decode_bank());
 
         save_reader.add_to_save_map("combat_manager.base_manager", |r| {
-            r.decode_base_manager(|r| r.decode_player(), |r| r.decode_enemy())
+            r.decode_base_manager(
+                |r| r.decode_player(),
+                |r| r.decode_enemy(true),
+            )
         });
 
         // combat_manager
@@ -407,6 +439,8 @@ impl MelvorSaveReader {
         save_reader
             .add_to_save_map("raid_manager", |r| r.decode_raid_manager());
 
+        save_reader.add_to_save_map("minibar", |r| r.decode_minibar());
+
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
         return Some(save_reader);
@@ -512,7 +546,7 @@ impl MelvorSaveReader {
 
 fn open_save() -> Option<()> {
     // Open file save.txt
-    let save = match std::fs::read_to_string("save2.txt") {
+    let save = match std::fs::read_to_string("save3.txt") {
         Ok(content) => content,
         Err(e) => {
             println!("Failed to read save.txt: {}", e);

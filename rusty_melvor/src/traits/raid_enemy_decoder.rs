@@ -9,7 +9,11 @@ pub trait RaidEnemyDecoder: EnemyDecoder {
         let r = self;
         let mut map = Map::new();
 
-        map.insert("enemy".into(), r.decode_enemy());
+        map.insert("enemy".into(), r.decode_enemy(false));
+
+        // r.print_previous_bytes(100);
+        // r.print_next_bytes(100);
+
         if r.read_bool() {
             map.insert(
                 "monster".into(),

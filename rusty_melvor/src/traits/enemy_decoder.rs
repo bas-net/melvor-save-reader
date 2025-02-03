@@ -7,7 +7,7 @@ use super::{
 };
 
 pub trait EnemyDecoder: CharacterDecoder {
-    fn decode_enemy(&mut self) -> Value {
+    fn decode_enemy(&mut self, encode_monster: bool) -> Value {
         let r = self;
         let mut map = Map::new();
 
@@ -25,11 +25,13 @@ pub trait EnemyDecoder: CharacterDecoder {
             .into()
         });
 
-        if r.read_bool() {
-            map.insert(
-                "monster".into(),
-                r.get_save_map_namedspaced_object().into(),
-            );
+        if encode_monster {
+            if r.read_bool() {
+                map.insert(
+                    "monster".into(),
+                    r.get_save_map_namedspaced_object().into(),
+                );
+            }
         }
 
         if r.read_bool() {
