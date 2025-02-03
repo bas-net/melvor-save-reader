@@ -20,6 +20,7 @@ use traits::base_manager_decoder::BaseManagerDecoder;
 use traits::character_decoder::CharacterDecoder;
 use traits::enemy_decoder::EnemyDecoder;
 use traits::minibar_decoder::MinibarDecoder;
+use traits::pet_manager_decoder::PetManagerDecoder;
 use traits::player_decoder::PlayerDecoder;
 use traits::raid_enemy_decoder::RaidEnemyDecoder;
 use traits::raid_manager_decoder::RaidManagerDecoder;
@@ -181,6 +182,7 @@ impl RaidManagerDecoder for BinaryReader {}
 
 impl BankDecoder for BinaryReader {}
 impl MinibarDecoder for BinaryReader {}
+impl PetManagerDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -440,6 +442,8 @@ impl MelvorSaveReader {
             .add_to_save_map("raid_manager", |r| r.decode_raid_manager());
 
         save_reader.add_to_save_map("minibar", |r| r.decode_minibar());
+
+        save_reader.add_to_save_map("pets", |r| r.decode_pet_manager());
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
