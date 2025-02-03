@@ -15,6 +15,19 @@ use std::str;
 // use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use serde_json::{to_writer_pretty, Map, Number, Value};
+use traits::base_manager_decoder::BaseManagerDecoder;
+use traits::character_decoder::CharacterDecoder;
+use traits::enemy_decoder::EnemyDecoder;
+use traits::player_decoder::PlayerDecoder;
+use traits::raid_enemy_decoder::RaidEnemyDecoder;
+use traits::raid_manager_decoder::RaidManagerDecoder;
+use traits::raid_player_decoder::RaidPlayerDecoder;
+use traits::read::{
+    Buffer, BufferReader, ByteOffset, DataReaders, HasNumericToStringIdMap,
+};
+use traits::timer_decoder::TimerDecoder;
+
+mod traits;
 
 trait IntoNumber {
     fn into_number(self) -> Number;
@@ -135,165 +148,47 @@ struct BinaryReader {
     numeric_to_string_id_map: HashMap<u16, String>,
 }
 
+impl Buffer for BinaryReader {
+    fn get_slice(&mut self, start: usize, end: usize) -> Vec<u8> {
+        self.data[start..end].to_vec()
+    }
+}
+
+impl ByteOffset for BinaryReader {
+    fn get_byte_offset(&self) -> usize {
+        self.byte_offset
+    }
+
+    fn increment_byte_offset(&mut self, increment: usize) {
+        self.byte_offset += increment;
+        // println!("Byte offset: {}", self.byte_offset);
+    }
+}
+
+impl HasNumericToStringIdMap for BinaryReader {
+    fn map_numeric_to_string_id(&self, id: &u16) -> Option<String> {
+        match self.numeric_to_string_id_map.get(id) {
+            Some(text_id) => Some(text_id.to_string()),
+            None => None,
+        }
+    }
+}
+
+impl BufferReader for BinaryReader {}
+impl DataReaders for BinaryReader {}
+
+impl TimerDecoder for BinaryReader {}
+impl CharacterDecoder for BinaryReader {}
+impl PlayerDecoder for BinaryReader {}
+impl RaidPlayerDecoder for BinaryReader {}
+impl BaseManagerDecoder for BinaryReader {}
+impl EnemyDecoder for BinaryReader {}
+impl RaidEnemyDecoder for BinaryReader {}
+impl RaidManagerDecoder for BinaryReader {}
+
 impl BinaryReader {
-    fn read_buffer_of_size(&mut self, size: usize) -> Vec<u8> {
-        let buffer =
-            self.data[self.byte_offset..self.byte_offset + size].to_vec();
-        self.byte_offset += size;
-
-        // for byte in &buffer {
-        //     match str::from_utf8(&[*byte]) {
-        //         Ok(byte_str) => print!("{:02x}-{} ", byte, byte_str),
-        //         Err(e) => print!("{:02x} ", byte),
-        //     }
-        // }
-        // println!();
-
-        buffer
-    }
-
-    fn read_uint32(&mut self) -> u32 {
-        let buffer = self.read_buffer_of_size(4);
-        let uint32 =
-            u32::from_be_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
-
-        uint32
-    }
-
-    fn read_uint16(&mut self) -> u16 {
-        let buffer = self.read_buffer_of_size(2);
-        let uint16 = u16::from_be_bytes([buffer[0], buffer[1]]);
-
-        uint16
-    }
-
-    fn read_uint8(&mut self) -> u8 {
-        let buffer = self.read_buffer_of_size(1);
-        let uint8 = buffer[0];
-
-        uint8
-    }
-
-    fn read_string(&mut self) -> String {
-        let string_length = self.read_uint32();
-        // println!("String length: {}", string_length);
-
-        let string = match str::from_utf8(
-            &self.data
-                [self.byte_offset..self.byte_offset + string_length as usize],
-        ) {
-            Ok(string) => string,
-            Err(e) => {
-                println!("Failed to decode string: {}", e);
-                return String::new();
-            }
-        };
-        self.byte_offset += string_length as usize;
-        string.to_string()
-    }
-
-    fn read_buffer(&mut self) -> Vec<u8> {
-        let buffer_length = self.read_uint32();
-        // println!("Buffer length: {}", buffer_length);
-
-        let buffer = self.read_buffer_of_size(buffer_length as usize);
-
-        buffer
-    }
-
-    fn read_float64(&mut self) -> f64 {
-        let buffer = self.read_buffer_of_size(8);
-        let float64 = f64::from_be_bytes([
-            buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5],
-            buffer[6], buffer[7],
-        ]);
-
-        float64
-    }
-
-    fn read_bool(&mut self) -> bool {
-        let buffer = self.read_buffer_of_size(1);
-        let boolean = buffer[0] == 1;
-
-        boolean
-    }
-
-    fn read_set<T, F>(&mut self, read_value: F) -> Vec<T>
-    where
-        F: Fn(&mut Self) -> T,
-    {
-        let set_size = self.read_uint32();
-
-        let mut set = Vec::new();
-        for _ in 0..set_size {
-            let value = read_value(self);
-            set.push(value);
-        }
-
-        set
-    }
-
-    fn read_vector<T, F>(&mut self, read_value: F) -> Vec<T>
-    where
-        F: Fn(&mut Self) -> T,
-    {
-        let vector_size = self.read_uint32();
-
-        let mut vector = Vec::new();
-        for _ in 0..vector_size {
-            let value = read_value(self);
-            vector.push(value);
-        }
-
-        vector
-    }
-
-    fn read_map<K, V, F, G>(
-        &mut self,
-        read_key: F,
-        read_value: G,
-    ) -> HashMap<K, V>
-    where
-        F: Fn(&mut Self) -> K,
-        G: Fn(&mut Self) -> V,
-        K: Eq,
-        K: std::hash::Hash,
-    {
-        let map_size = self.read_uint32();
-
-        let mut map = HashMap::new();
-        for _ in 0..map_size {
-            let key = read_key(self);
-            let value = read_value(self);
-            map.insert(key, value);
-        }
-
-        map
-    }
-
-    fn read_value_map_key<F, G>(
-        &mut self,
-        read_key: F,
-        read_value: G,
-    ) -> Map<String, Value>
-    where
-        F: Fn(&mut Self) -> String,
-        G: Fn(&mut Self, &String) -> Value,
-    {
-        let map_size = self.read_uint32();
-
-        let mut map = Map::new();
-        for _ in 0..map_size {
-            let key = read_key(self);
-            let value = read_value(self, &key);
-            map.insert(key.into(), value.into());
-        }
-
-        map
-    }
-
     fn validate_file_is_melvor_save(&mut self) -> bool {
-        let buffer = self.read_buffer_of_size(6);
+        let buffer = self.read_buffer_by_size(6);
         let melvor = match str::from_utf8(buffer.as_slice()) {
             Ok(melvor) => melvor,
             Err(e) => {
@@ -303,21 +198,6 @@ impl BinaryReader {
         };
 
         return melvor == "melvor";
-    }
-
-    fn get_save_map_namedspaced_object(&mut self) -> NamespacedObject {
-        let id = self.read_uint16();
-        let text_id = match self.numeric_to_string_id_map.get(&id) {
-            Some(text_id) => Some(text_id.to_string()),
-            None => None,
-        };
-
-        let object = NamespacedObject { id, text_id };
-        object
-    }
-
-    fn skip(&mut self, size: usize) {
-        self.byte_offset += size;
     }
 }
 
@@ -431,41 +311,16 @@ impl MelvorSaveReader {
             .into()
         });
 
-        // let custom_sort_order = save_reader
-        //     .raw_data
-        //     .read_vector(|r| r.get_save_map_namedspaced_object());
-
         save_reader.add_to_save_map("custom_sort_order", |r| {
             r.read_vector(|r| {
                 let item = r.get_save_map_namedspaced_object();
                 item
             })
         });
-        // for (index, item_id) in custom_sort_order.iter().enumerate() {
-        //     println!(
-        //         "Custom sort order: {}, {}, {}",
-        //         index,
-        //         item_id.id,
-        //         item_id.text_id.as_ref().unwrap_or(&"".to_string())
-        //     );
-        // }
-
-        // let glowing_items = save_reader
-        //     .raw_data
-        //     .read_set(|r| r.get_save_map_namedspaced_object());
 
         save_reader.add_to_save_map("glowing_items", |r| {
             r.read_set(|r| r.get_save_map_namedspaced_object())
         });
-
-        // for item_id in glowing_items.iter() {
-        //     println!("Glowing item: {}", item_id.id);
-        // }
-
-        // let tab_icons = save_reader.raw_data.read_map(
-        //     |r| r.read_uint8(),
-        //     |r| r.get_save_map_namedspaced_object(),
-        // );
 
         save_reader.add_to_save_map("tab_icons", |r| -> Value {
             r.read_value_map_key(
@@ -474,360 +329,9 @@ impl MelvorSaveReader {
             )
             .into()
         });
-        // for (tab_index, item) in tab_icons.iter() {
-        //     println!("Tab icon: {}, {}", tab_index, item.id);
-        // }
 
-        // Combat Manager
-        //   Base Manager
-        //     Player
-        //       Character
-        // save_reader
-        //     .add_to_save_map("combat_manager.hitpoints", |r| r.read_uint32());
-        // save_reader.add_to_save_map("nextAction", |r| {
-        //     if r.read_uint8() == 1 {
-        //         "Attack"
-        //     } else {
-        //         "Nothing"
-        //     }
-        // });
-        // save_reader.add_to_save_map("attack_count", |r| r.read_uint32());
-        // save_reader.add_to_save_map_namedspaced_object("next_attack");
-        // save_reader.add_to_save_map_bool("is_attacking");
-        // save_reader.add_to_save_map_bool("first_hit");
-
-        // // timers.act
-        // save_reader.add_to_save_map("combat.timers.act", |r| read_timer(r));
-        // save_reader.add_to_save_map("combat.timers.regen", |r| read_timer(r));
-
-        // save_reader.add_to_save_map("combat.player.character", |r| {
-        //     let mut map = Map::new();
-        //     map.insert("turns_taken".into(), r.read_uint32().into());
-        //     map.insert("buffered_regen".into(), r.read_uint32().into());
-        //     // decode active effects
-        //     map.insert(
-        //         "active_effects".into(),
-        //         r.read_value_map_key(
-        //             |r| match r.get_save_map_namedspaced_object().text_id {
-        //                 Some(text_id) => text_id,
-        //                 None => "".to_string(),
-        //             },
-        //             |r, k| {
-        //                 if k == "" {
-        //                     // Skip
-        //                     r.skip(18);
-        //                     r.read_vector(|r| {
-        //                         r.read_string();
-        //                         r.skip(4);
-        //                         Value::Null
-        //                     });
-        //                     r.read_vector(|r| {
-        //                         r.read_string();
-        //                         r.skip(4);
-        //                         Value::Null
-        //                     });
-        //                     r.read_vector(|r| {
-        //                         r.read_string();
-        //                         r.skip(4);
-        //                         Value::Null
-        //                     });
-        //                     r.read_vector(|r| {
-        //                         r.read_string();
-        //                         // Skip timer
-        //                         r.skip(9);
-        //                         Value::Null
-        //                     });
-
-        //                     Value::Null
-        //                 } else {
-        //                     // ActiveEffect decode
-        //                     let mut map = Map::new();
-        //                     map.insert(
-        //                         "source_character".into(),
-        //                         r.read_bool().into(),
-        //                     );
-
-        //                     let source = r.read_uint8();
-        //                     map.insert(
-        //                         "source".into(),
-        //                         match source {
-        //                             0 => "Attack".into(),
-        //                             1 => "Effect".into(),
-        //                             _ => "Other".into(),
-        //                         },
-        //                     );
-
-        //                     map.insert(
-        //                         "damageDealt".into(),
-        //                         r.read_float64().into(),
-        //                     );
-        //                     map.insert(
-        //                         "damageTaken".into(),
-        //                         r.read_float64().into(),
-        //                     );
-
-        //                     map.insert(
-        //                         "parameters".into(),
-        //                         r.read_vector(|r| -> Value {
-        //                             let mut param_map = Map::new();
-        //                             param_map.insert(
-        //                                 "name".into(),
-        //                                 r.read_string().into(),
-        //                             );
-        //                             param_map.insert(
-        //                                 "value".into(),
-        //                                 r.read_uint32().into(),
-        //                             );
-        //                             param_map.into()
-        //                         })
-        //                         .into(),
-        //                     );
-
-        //                     map.insert(
-        //                         "stat_groups".into(),
-        //                         r.read_vector(|r| -> Value {
-        //                             let mut map = Map::new();
-        //                             map.insert(
-        //                                 "name".into(),
-        //                                 r.read_string().into(),
-        //                             );
-        //                             map.insert(
-        //                                 "value".into(),
-        //                                 r.read_uint32().into(),
-        //                             );
-        //                             map.into()
-        //                         })
-        //                         .into(),
-        //                     );
-
-        //                     map.insert(
-        //                         "timers".into(),
-        //                         r.read_vector(|r| -> Value {
-        //                             let mut map = Map::new();
-        //                             map.insert(
-        //                                 "name".into(),
-        //                                 r.read_string().into(),
-        //                             );
-        //                             map.insert("timer".into(), read_timer(r));
-        //                             map.into()
-        //                         })
-        //                         .into(),
-        //                     );
-
-        //                     map.into()
-        //                 }
-        //             },
-        //         )
-        //         .into(),
-        //     );
-
-        //     map.insert("first_miss".into(), r.read_bool().into());
-        //     map.insert("barrier".into(), r.read_uint32().into());
-
-        //     map
-        // });
-
-        save_reader.add_to_save_map("combat.player.character", |r| {
-            decode_character(r)
-        });
-
-        save_reader.add_to_save_map("combat.player", |r| {
-            let mut map = Map::new();
-            // Melee
-            if r.read_bool() {
-                map.insert(
-                    "melee_style".into(),
-                    r.get_save_map_namedspaced_object().into(),
-                );
-            }
-            // Ranged
-            if r.read_bool() {
-                map.insert(
-                    "ranged_style".into(),
-                    r.get_save_map_namedspaced_object().into(),
-                );
-            }
-            // Magic
-            if r.read_bool() {
-                map.insert(
-                    "magic_style".into(),
-                    r.get_save_map_namedspaced_object().into(),
-                );
-            }
-            map.insert("prayer_points".into(), r.read_uint32().into());
-            map.insert(
-                "selected_equipment_set".into(),
-                r.read_uint16().into(),
-            );
-
-            // Equipment sets
-            map.insert(
-                "equipment_sets".into(),
-                r.read_vector(|r| -> Value {
-                    let mut map = Map::new();
-                    // Equipment
-                    map.insert(
-                        "equipment".into(),
-                        r.read_vector(|r| -> Value {
-                            let mut map = Map::new();
-                            map.insert(
-                                "slot".into(),
-                                r.get_save_map_namedspaced_object().into(),
-                            );
-                            if r.read_bool() {
-                                map.insert(
-                                    "item".into(),
-                                    r.get_save_map_namedspaced_object().into(),
-                                );
-                                map.insert(
-                                    "quantity".into(),
-                                    r.read_uint32().into(),
-                                );
-                            }
-                            map.insert(
-                                "quick_equip_items".into(),
-                                r.read_vector(|r| -> Value {
-                                    r.get_save_map_namedspaced_object().into()
-                                })
-                                .into(),
-                            );
-
-                            map.into()
-                        })
-                        .into(),
-                    );
-
-                    // Spell Selection
-                    if r.read_bool() {
-                        map.insert(
-                            "spell".into(),
-                            r.get_save_map_namedspaced_object().into(),
-                        );
-                    }
-                    if r.read_bool() {
-                        map.insert(
-                            "aurora".into(),
-                            r.get_save_map_namedspaced_object().into(),
-                        );
-                    }
-                    if r.read_bool() {
-                        map.insert(
-                            "curse".into(),
-                            r.get_save_map_namedspaced_object().into(),
-                        );
-                    }
-
-                    // Prayer selection (set)
-                    map.insert(
-                        "prayers".into(),
-                        r.read_set(|r| -> Value {
-                            r.get_save_map_namedspaced_object().into()
-                        })
-                        .into(),
-                    );
-
-                    map.into()
-                })
-                .into(),
-            );
-
-            // player.food
-            map.insert("food".into(), {
-                let mut map = Map::new();
-                map.insert("selected_slot".into(), r.read_uint32().into());
-                map.insert("max_slots".into(), r.read_uint32().into());
-
-                map.insert(
-                    "slots".into(),
-                    r.read_vector(|r| -> Value {
-                        let mut map = Map::new();
-                        map.insert(
-                            "item".into(),
-                            r.get_save_map_namedspaced_object().into(),
-                        );
-                        map.insert("quantity".into(), r.read_uint32().into());
-                        map.into()
-                    })
-                    .into(),
-                );
-
-                map.into()
-            });
-
-            // player.timers.summon
-            map.insert("summon_timer".into(), read_timer(r));
-
-            map.insert("soul_points".into(), r.read_uint32().into());
-            map.insert(
-                "unholy_prayer_multiplier".into(),
-                r.read_uint8().into(),
-            );
-
-            map
-        });
-
-        // combat_manager.base_manager.enemy.character
-        save_reader.add_to_save_map(
-            "combat_manager.base_manager.enemy.character",
-            |r| decode_character(r),
-        );
-
-        // combat_manager.base_manager.enemy
-        save_reader.add_to_save_map(
-            "combat_manager.base_manager.enemy",
-            |r| {
-                let mut map = Map::new();
-                map.insert("state".into(), r.read_uint8().into());
-                map.insert("random_attack_type".into(), {
-                    match r.read_uint8() {
-                        0 => "Melee",
-                        1 => "Ranged",
-                        2 => "Magic",
-                        3 => "Unset",
-                        _ => "Other",
-                    }
-                    .into()
-                });
-
-                if r.read_bool() {
-                    map.insert(
-                        "monster".into(),
-                        r.get_save_map_namedspaced_object().into(),
-                    );
-                }
-
-                if r.read_bool() {
-                    map.insert(
-                        "override_damage_type".into(),
-                        r.get_save_map_namedspaced_object().into(),
-                    );
-                }
-
-                map
-            },
-        );
-
-        // combat_manager.base_manager
         save_reader.add_to_save_map("combat_manager.base_manager", |r| {
-            let mut map = Map::new();
-            map.insert("fight_in_progress".into(), r.read_bool().into());
-            map.insert("spawn_timer".into(), read_timer(r));
-            map.insert("is_active".into(), r.read_bool().into());
-
-            // decode passives
-            map.insert(
-                "passives".into(),
-                r.read_vector(|r| -> Value {
-                    let passive = r.get_save_map_namedspaced_object();
-                    let mut passive_map = Map::new();
-                    passive_map.insert("passive".into(), passive.into());
-                    passive_map.insert("display".into(), r.read_bool().into());
-                    passive_map.into()
-                })
-                .into(),
-            );
-
-            map
+            r.decode_base_manager(|r| r.decode_player(), |r| r.decode_enemy())
         });
 
         // combat_manager
@@ -979,11 +483,9 @@ impl MelvorSaveReader {
         });
 
         // raid_manager
-        // raid_manager.base_manager
-        // raid_manager.base_manager.player
-        // raid_manager.base_manager.player.character
-        // raid_manager.base_manager.enemy
-        // raid_manager.base_manager.enemy.character
+        save_reader.add_to_save_map("raid_manager", |r| {
+            r.decode_raid_manager()
+        });
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
@@ -1141,135 +643,135 @@ fn read_timer(reader: &mut BinaryReader) -> Value {
     map.into()
 }
 
-fn decode_character(r: &mut BinaryReader) -> Value {
-    let mut map = Map::new();
-    map.insert("combat_manager.hitpoints".into(), r.read_uint32().into());
-    map.insert(
-        "nextAction".into(),
-        {
-            match r.read_uint8() {
-                1 => "Attack",
-                _ => "Nothing",
-            }
-        }
-        .into(),
-    );
+// fn decode_character(r: &mut BinaryReader) -> Value {
+//     let mut map = Map::new();
+//     map.insert("combat_manager.hitpoints".into(), r.read_uint32().into());
+//     map.insert(
+//         "nextAction".into(),
+//         {
+//             match r.read_uint8() {
+//                 1 => "Attack",
+//                 _ => "Nothing",
+//             }
+//         }
+//         .into(),
+//     );
 
-    map.insert("attack_count".into(), r.read_uint32().into());
-    map.insert(
-        "next_attack".into(),
-        r.get_save_map_namedspaced_object().into(),
-    );
-    map.insert("is_attacking".into(), r.read_bool().into());
-    map.insert("first_hit".into(), r.read_bool().into());
+//     map.insert("attack_count".into(), r.read_uint32().into());
+//     map.insert(
+//         "next_attack".into(),
+//         r.get_save_map_namedspaced_object().into(),
+//     );
+//     map.insert("is_attacking".into(), r.read_bool().into());
+//     map.insert("first_hit".into(), r.read_bool().into());
 
-    map.insert("timers_act".into(), read_timer(r));
-    map.insert("timers_regen".into(), read_timer(r));
+//     map.insert("timers_act".into(), read_timer(r));
+//     map.insert("timers_regen".into(), read_timer(r));
 
-    map.insert("turns_taken".into(), r.read_uint32().into());
-    map.insert("buffered_regen".into(), r.read_uint32().into());
-    // decode active effects
-    map.insert(
-        "active_effects".into(),
-        r.read_value_map_key(
-            |r| match r.get_save_map_namedspaced_object().text_id {
-                Some(text_id) => text_id,
-                None => "".to_string(),
-            },
-            |r, k| {
-                if k == "" {
-                    // Skip
-                    r.skip(18);
-                    r.read_vector(|r| {
-                        r.read_string();
-                        r.skip(4);
-                        Value::Null
-                    });
-                    r.read_vector(|r| {
-                        r.read_string();
-                        r.skip(4);
-                        Value::Null
-                    });
-                    r.read_vector(|r| {
-                        r.read_string();
-                        r.skip(4);
-                        Value::Null
-                    });
-                    r.read_vector(|r| {
-                        r.read_string();
-                        // Skip timer
-                        r.skip(9);
-                        Value::Null
-                    });
+//     map.insert("turns_taken".into(), r.read_uint32().into());
+//     map.insert("buffered_regen".into(), r.read_uint32().into());
+//     // decode active effects
+//     map.insert(
+//         "active_effects".into(),
+//         r.read_value_map_key(
+//             |r| match r.get_save_map_namedspaced_object().text_id {
+//                 Some(text_id) => text_id,
+//                 None => "".to_string(),
+//             },
+//             |r, k| {
+//                 if k == "" {
+//                     // Skip
+//                     r.skip(18);
+//                     r.read_vector(|r| {
+//                         r.read_string();
+//                         r.skip(4);
+//                         Value::Null
+//                     });
+//                     r.read_vector(|r| {
+//                         r.read_string();
+//                         r.skip(4);
+//                         Value::Null
+//                     });
+//                     r.read_vector(|r| {
+//                         r.read_string();
+//                         r.skip(4);
+//                         Value::Null
+//                     });
+//                     r.read_vector(|r| {
+//                         r.read_string();
+//                         // Skip timer
+//                         r.skip(9);
+//                         Value::Null
+//                     });
 
-                    Value::Null
-                } else {
-                    // ActiveEffect decode
-                    let mut map = Map::new();
-                    map.insert(
-                        "source_character".into(),
-                        r.read_bool().into(),
-                    );
+//                     Value::Null
+//                 } else {
+//                     // ActiveEffect decode
+//                     let mut map = Map::new();
+//                     map.insert(
+//                         "source_character".into(),
+//                         r.read_bool().into(),
+//                     );
 
-                    let source = r.read_uint8();
-                    map.insert(
-                        "source".into(),
-                        match source {
-                            0 => "Attack".into(),
-                            1 => "Effect".into(),
-                            _ => "Other".into(),
-                        },
-                    );
+//                     let source = r.read_uint8();
+//                     map.insert(
+//                         "source".into(),
+//                         match source {
+//                             0 => "Attack".into(),
+//                             1 => "Effect".into(),
+//                             _ => "Other".into(),
+//                         },
+//                     );
 
-                    map.insert("damageDealt".into(), r.read_float64().into());
-                    map.insert("damageTaken".into(), r.read_float64().into());
+//                     map.insert("damageDealt".into(), r.read_float64().into());
+//                     map.insert("damageTaken".into(), r.read_float64().into());
 
-                    map.insert(
-                        "parameters".into(),
-                        r.read_vector(|r| -> Value {
-                            let mut param_map = Map::new();
-                            param_map
-                                .insert("name".into(), r.read_string().into());
-                            param_map.insert(
-                                "value".into(),
-                                r.read_uint32().into(),
-                            );
-                            param_map.into()
-                        })
-                        .into(),
-                    );
+//                     map.insert(
+//                         "parameters".into(),
+//                         r.read_vector(|r| -> Value {
+//                             let mut param_map = Map::new();
+//                             param_map
+//                                 .insert("name".into(), r.read_string().into());
+//                             param_map.insert(
+//                                 "value".into(),
+//                                 r.read_uint32().into(),
+//                             );
+//                             param_map.into()
+//                         })
+//                         .into(),
+//                     );
 
-                    map.insert(
-                        "stat_groups".into(),
-                        r.read_vector(|r| -> Value {
-                            let mut map = Map::new();
-                            map.insert("name".into(), r.read_string().into());
-                            map.insert("value".into(), r.read_uint32().into());
-                            map.into()
-                        })
-                        .into(),
-                    );
+//                     map.insert(
+//                         "stat_groups".into(),
+//                         r.read_vector(|r| -> Value {
+//                             let mut map = Map::new();
+//                             map.insert("name".into(), r.read_string().into());
+//                             map.insert("value".into(), r.read_uint32().into());
+//                             map.into()
+//                         })
+//                         .into(),
+//                     );
 
-                    map.insert(
-                        "timers".into(),
-                        r.read_vector(|r| -> Value {
-                            let mut map = Map::new();
-                            map.insert("name".into(), r.read_string().into());
-                            map.insert("timer".into(), read_timer(r));
-                            map.into()
-                        })
-                        .into(),
-                    );
+//                     map.insert(
+//                         "timers".into(),
+//                         r.read_vector(|r| -> Value {
+//                             let mut map = Map::new();
+//                             map.insert("name".into(), r.read_string().into());
+//                             map.insert("timer".into(), read_timer(r));
+//                             map.into()
+//                         })
+//                         .into(),
+//                     );
 
-                    map.into()
-                }
-            },
-        )
-        .into(),
-    );
+//                     map.into()
+//                 }
+//             },
+//         )
+//         .into(),
+//     );
 
-    map.insert("first_miss".into(), r.read_bool().into());
-    map.insert("barrier".into(), r.read_uint32().into());
+//     map.insert("first_miss".into(), r.read_bool().into());
+//     map.insert("barrier".into(), r.read_uint32().into());
 
-    map.into()
-}
+//     map.into()
+// }
