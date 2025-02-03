@@ -1,23 +1,10 @@
 use serde_json::{Map, Value};
 
 use super::{
-    base_manager_decoder::BaseManagerDecoder, player_decoder::PlayerDecoder,
+    bank_decoder::BankDecoder, base_manager_decoder::BaseManagerDecoder,
     raid_enemy_decoder::RaidEnemyDecoder,
-    raid_player_decoder::RaidPlayerDecoder, read::DataReaders,
-    timer_decoder::TimerDecoder,
+    raid_player_decoder::RaidPlayerDecoder,
 };
-
-// ModifierScope.SCOPE_BIT_FIELD = {
-//     skill: 1,
-//     damageType: 2,
-//     realm: 4,
-//     currency: 8,
-//     category: 16,
-//     action: 32,
-//     subcategory: 64,
-//     item: 128,
-//     effectGroup: 256,
-// };
 
 enum ModifierScope {
     Skill = 1,
@@ -32,10 +19,9 @@ enum ModifierScope {
 }
 
 pub trait RaidManagerDecoder:
-    BaseManagerDecoder + RaidEnemyDecoder + RaidPlayerDecoder + Sized
+    BaseManagerDecoder + RaidEnemyDecoder + RaidPlayerDecoder + Sized + BankDecoder
 {
-    fn decode_raid_manager(&mut self) -> Value
-    {
+    fn decode_raid_manager(&mut self) -> Value {
         let r = self;
         let mut map = Map::new();
 
@@ -62,7 +48,7 @@ pub trait RaidManagerDecoder:
         map.insert("_set_dificulty".into(), r.read_uint8().into());
 
         // GolbinRaidBank
-        // TODO: Implement GolbinRaidBank
+        map.insert("bank".into(), r.decode_bank());
 
         map.into()
     }

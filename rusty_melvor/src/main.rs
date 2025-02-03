@@ -15,6 +15,7 @@ use std::str;
 // use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use serde_json::{to_writer_pretty, Map, Number, Value};
+use traits::bank_decoder::BankDecoder;
 use traits::base_manager_decoder::BaseManagerDecoder;
 use traits::character_decoder::CharacterDecoder;
 use traits::enemy_decoder::EnemyDecoder;
@@ -28,28 +29,6 @@ use traits::read::{
 use traits::timer_decoder::TimerDecoder;
 
 mod traits;
-
-trait IntoNumber {
-    fn into_number(self) -> Number;
-}
-
-impl IntoNumber for u16 {
-    fn into_number(self) -> Number {
-        Number::from(self)
-    }
-}
-
-impl IntoNumber for u8 {
-    fn into_number(self) -> Number {
-        Number::from(self)
-    }
-}
-
-impl IntoNumber for f64 {
-    fn into_number(self) -> Number {
-        Number::from_f64(self).unwrap()
-    }
-}
 
 trait IntoValue {
     fn into_value(self) -> Value;
@@ -92,20 +71,6 @@ impl From<NamespacedObject> for Value {
             }
             None => None,
         };
-        Value::Object(map)
-    }
-}
-
-struct BankItem {
-    item: NamespacedObject,
-    quantity: u32,
-}
-
-impl IntoValue for BankItem {
-    fn into_value(self) -> Value {
-        let mut map = Map::new();
-        map.insert("item".into(), self.item.into());
-        map.insert("quantity".into(), self.quantity.into());
         Value::Object(map)
     }
 }
@@ -185,6 +150,8 @@ impl BaseManagerDecoder for BinaryReader {}
 impl EnemyDecoder for BinaryReader {}
 impl RaidEnemyDecoder for BinaryReader {}
 impl RaidManagerDecoder for BinaryReader {}
+
+impl BankDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -282,53 +249,7 @@ impl MelvorSaveReader {
         save_reader.add_to_save_map_uint16("game_mode_id");
         save_reader.add_to_save_map_string("character_name");
 
-        // Bank
-        // Items that are in your bank and are locked so you can't sell them etc.
-        save_reader
-            .add_to_save_map_set("bank.locked_items", |r| r.read_uint16());
-
-        save_reader.add_to_save_map_vector("bank.items_by_bank_tab", |r| {
-            r.read_vector(|r| {
-                let item = r.get_save_map_namedspaced_object();
-                BankItem {
-                    item: item,
-                    quantity: r.read_uint32(),
-                }
-            })
-        });
-
-        save_reader.add_to_save_map("default_item_tabs", |r| -> Value {
-            r.read_value_map_key(
-                |r| {
-                    let item = r.get_save_map_namedspaced_object();
-                    match item.text_id {
-                        Some(text_id) => text_id,
-                        None => item.id.to_string(),
-                    }
-                },
-                |r, _| r.read_uint8().into(),
-            )
-            .into()
-        });
-
-        save_reader.add_to_save_map("custom_sort_order", |r| {
-            r.read_vector(|r| {
-                let item = r.get_save_map_namedspaced_object();
-                item
-            })
-        });
-
-        save_reader.add_to_save_map("glowing_items", |r| {
-            r.read_set(|r| r.get_save_map_namedspaced_object())
-        });
-
-        save_reader.add_to_save_map("tab_icons", |r| -> Value {
-            r.read_value_map_key(
-                |r| r.read_uint8().to_string(),
-                |r, _| r.get_save_map_namedspaced_object().into(),
-            )
-            .into()
-        });
+        save_reader.add_to_save_map("bank", |r| r.decode_bank());
 
         save_reader.add_to_save_map("combat_manager.base_manager", |r| {
             r.decode_base_manager(|r| r.decode_player(), |r| r.decode_enemy())
@@ -483,9 +404,8 @@ impl MelvorSaveReader {
         });
 
         // raid_manager
-        save_reader.add_to_save_map("raid_manager", |r| {
-            r.decode_raid_manager()
-        });
+        save_reader
+            .add_to_save_map("raid_manager", |r| r.decode_raid_manager());
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
@@ -547,32 +467,32 @@ impl MelvorSaveReader {
         );
     }
 
-    fn add_to_save_map_set<T, F>(&mut self, key: &str, read_value: F)
-    where
-        T: IntoNumber,
-        F: Fn(&mut BinaryReader) -> T,
-    {
-        self.save_map.insert(
-            key.to_string(),
-            Value::Array(
-                self.raw_data
-                    .read_set(|r| Value::Number(read_value(r).into_number())),
-            ),
-        );
-    }
+    // fn add_to_save_map_set<T, F>(&mut self, key: &str, read_value: F)
+    // where
+    //     T: IntoNumber,
+    //     F: Fn(&mut BinaryReader) -> T,
+    // {
+    //     self.save_map.insert(
+    //         key.to_string(),
+    //         Value::Array(
+    //             self.raw_data
+    //                 .read_set(|r| Value::Number(read_value(r).into_number())),
+    //         ),
+    //     );
+    // }
 
-    fn add_to_save_map_vector<T, F>(&mut self, key: &str, read_value: F)
-    where
-        T: IntoValue,
-        F: Fn(&mut BinaryReader) -> T,
-    {
-        self.save_map.insert(
-            key.to_string(),
-            Value::Array(
-                self.raw_data.read_vector(|r| read_value(r).into_value()),
-            ),
-        );
-    }
+    // fn add_to_save_map_vector<T, F>(&mut self, key: &str, read_value: F)
+    // where
+    //     T: IntoValue,
+    //     F: Fn(&mut BinaryReader) -> T,
+    // {
+    //     self.save_map.insert(
+    //         key.to_string(),
+    //         Value::Array(
+    //             self.raw_data.read_vector(|r| read_value(r).into_value()),
+    //         ),
+    //     );
+    // }
 
     fn add_to_save_map<T, F>(&mut self, key: &str, read_value: F)
     where
@@ -583,11 +503,11 @@ impl MelvorSaveReader {
             .insert(key.to_string(), read_value(&mut self.raw_data).into());
     }
 
-    fn add_to_save_map_namedspaced_object(&mut self, key: &str) {
-        let object = self.raw_data.get_save_map_namedspaced_object();
+    // fn add_to_save_map_namedspaced_object(&mut self, key: &str) {
+    //     let object = self.raw_data.get_save_map_namedspaced_object();
 
-        self.save_map.insert(key.to_string(), object.into());
-    }
+    //     self.save_map.insert(key.to_string(), object.into());
+    // }
 }
 
 fn open_save() -> Option<()> {
