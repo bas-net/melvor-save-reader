@@ -1,10 +1,6 @@
 use serde_json::{Map, Value};
 
-use crate::NamespacedObject;
-
-use super::{
-    character_decoder::CharacterDecoder, player_decoder::PlayerDecoder,
-};
+use super::character_decoder::CharacterDecoder;
 
 pub trait EnemyDecoder: CharacterDecoder {
     fn decode_enemy(&mut self, encode_monster: bool) -> Value {
@@ -25,13 +21,11 @@ pub trait EnemyDecoder: CharacterDecoder {
             .into()
         });
 
-        if encode_monster {
-            if r.read_bool() {
-                map.insert(
-                    "monster".into(),
-                    r.get_save_map_namedspaced_object().into(),
-                );
-            }
+        if encode_monster && r.read_bool() {
+            map.insert(
+                "monster".into(),
+                r.get_save_map_namedspaced_object().into(),
+            );
         }
 
         if r.read_bool() {

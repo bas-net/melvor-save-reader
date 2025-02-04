@@ -161,19 +161,15 @@ pub trait RaidManagerDecoder:
                     })
                     .into(),
                 );
-                map.insert(
-                    "food".into(),
-                    {
-                        let mut map = Map::new();
-                        map.insert(
-                            "item".into(),
-                            r.get_save_map_namedspaced_object().into(),
-                        );
-                        map.insert("quantity".into(), r.read_uint32().into());
-                        Into::<Value>::into(map)
-                    }
-                    .into(),
-                );
+                map.insert("food".into(), {
+                    let mut map = Map::new();
+                    map.insert(
+                        "item".into(),
+                        r.get_save_map_namedspaced_object().into(),
+                    );
+                    map.insert("quantity".into(), r.read_uint32().into());
+                    Into::<Value>::into(map)
+                });
 
                 map.insert("wave".into(), r.read_uint32().into());
                 map.insert("kills".into(), r.read_uint32().into());

@@ -74,10 +74,25 @@
 			"command": "clippy",
 			"args": [
 				"--fix",
+				"--allow-dirty",
 				"--bin",
-				"'rusty_melvor'"
+				"\"rusty_melvor\""
 			],
 			"label": ": Run cargo clippy --fix",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
+		{
+			"command": "cargo",
+			"args": [
+				"fmt",
+			],
+			"label": ": Run cargo fmt on whole project",
 			"options": {
 				"cwd": "${workspaceFolder}/rusty_melvor"
 			},

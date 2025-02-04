@@ -40,7 +40,7 @@ pub trait CharacterDecoder: DataReaders + TimerDecoder {
                     None => "".to_string(),
                 },
                 |r, k| {
-                    if k == "" {
+                    if k.is_empty() {
                         // Skip
                         r.skip(18);
                         r.read_vector(|r| {

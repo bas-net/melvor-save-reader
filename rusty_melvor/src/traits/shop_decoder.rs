@@ -1,13 +1,6 @@
 use serde_json::{Map, Value};
 
-use crate::{IntoValue, NamespacedObject};
-
-use super::{
-    base_manager_decoder::BaseManagerDecoder, player_decoder::PlayerDecoder,
-    raid_enemy_decoder::RaidEnemyDecoder,
-    raid_player_decoder::RaidPlayerDecoder, read::DataReaders,
-    timer_decoder::TimerDecoder,
-};
+use super::read::DataReaders;
 
 pub trait ShopDecoder: DataReaders {
     fn decode_shop(&mut self) -> Value {

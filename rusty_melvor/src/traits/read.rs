@@ -32,8 +32,6 @@ pub trait BufferReader: Buffer + ByteOffset {
     fn skip(&mut self, size: usize) {
         self.increment_byte_offset(size);
     }
-
-
 }
 
 pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
@@ -47,10 +45,9 @@ pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
     }
     fn read_uint32(&mut self) -> u32 {
         let buffer = self.read_buffer_by_size(4);
-        let u =
-            u32::from_be_bytes([buffer[0], buffer[1], buffer[2], buffer[3]]);
+
         // println!("u32: {}", u);
-        u
+        u32::from_be_bytes([buffer[0], buffer[1], buffer[2], buffer[3]])
     }
     fn read_float64(&mut self) -> f64 {
         let buffer = self.read_buffer_by_size(8);
@@ -72,9 +69,8 @@ pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
     }
     fn read_buffer(&mut self) -> Vec<u8> {
         let size = self.read_uint32() as usize;
-        let buffer = self.read_buffer_by_size(size);
 
-        buffer
+        self.read_buffer_by_size(size)
     }
     fn read_bool(&mut self) -> bool {
         self.read_uint8() == 1
@@ -123,7 +119,7 @@ pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
         for _ in 0..map_size {
             let key = read_key(self);
             let value = read_value(self, &key);
-            map.insert(key.into(), value.into());
+            map.insert(key, value);
         }
 
         map
@@ -131,12 +127,10 @@ pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
 
     fn get_save_map_namedspaced_object(&mut self) -> NamespacedObject {
         let id = self.read_uint16();
-        let text_id = match self.map_numeric_to_string_id(&id) {
-            Some(text_id) => Some(text_id.to_string()),
-            None => None,
-        };
+        let text_id = self
+            .map_numeric_to_string_id(&id)
+            .map(|text_id| text_id.to_string());
 
-        let object = NamespacedObject { id, text_id };
-        object
+        NamespacedObject { id, text_id }
     }
 }

@@ -1,7 +1,5 @@
 use serde_json::{Map, Value};
 
-use crate::NamespacedObject;
-
 use super::enemy_decoder::EnemyDecoder;
 
 pub trait RaidEnemyDecoder: EnemyDecoder {

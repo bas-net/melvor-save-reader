@@ -163,10 +163,9 @@ impl ByteOffset for BinaryReader {
 
 impl HasNumericToStringIdMap for BinaryReader {
     fn map_numeric_to_string_id(&self, id: &u16) -> Option<String> {
-        match self.numeric_to_string_id_map.get(id) {
-            Some(text_id) => Some(text_id.to_string()),
-            None => None,
-        }
+        self.numeric_to_string_id_map
+            .get(id)
+            .map(|text_id| text_id.to_string())
     }
 }
 
@@ -199,7 +198,7 @@ impl BinaryReader {
             }
         };
 
-        return melvor == "melvor";
+        melvor == "melvor"
     }
 }
 
@@ -212,7 +211,7 @@ struct MelvorSaveReader {
 impl MelvorSaveReader {
     fn read_save(data: Vec<u8>) -> Option<MelvorSaveReader> {
         let mut combined_reader = BinaryReader {
-            data: data,
+            data,
             byte_offset: 0,
             numeric_to_string_id_map: HashMap::new(),
         };
@@ -235,8 +234,8 @@ impl MelvorSaveReader {
         };
 
         let mut save_reader = MelvorSaveReader {
-            header: header,
-            raw_data: raw_data,
+            header,
+            raw_data,
             save_map: HashMap::new(),
         };
 
@@ -451,11 +450,12 @@ impl MelvorSaveReader {
 
         save_reader.add_to_save_map("shop", |r| r.decode_shop());
 
-        save_reader.add_to_save_map("item_charges", |r| r.decode_item_charges());
+        save_reader
+            .add_to_save_map("item_charges", |r| r.decode_item_charges());
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 
-        return Some(save_reader);
+        Some(save_reader)
     }
 
     fn read_header_map(&mut self) -> HashMap<String, HashMap<String, u16>> {

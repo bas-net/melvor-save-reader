@@ -16,7 +16,7 @@ pub trait MinibarDecoder: DataReaders {
                     NamespacedObject {
                         text_id: Some(text_id),
                         ..
-                    } => text_id.into(),
+                    } => text_id,
                     NamespacedObject { id, .. } => id.to_string(),
                 },
                 |r, _| {

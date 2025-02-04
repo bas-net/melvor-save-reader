@@ -2,12 +2,7 @@ use serde_json::{Map, Value};
 
 use crate::{IntoValue, NamespacedObject};
 
-use super::{
-    base_manager_decoder::BaseManagerDecoder, player_decoder::PlayerDecoder,
-    raid_enemy_decoder::RaidEnemyDecoder,
-    raid_player_decoder::RaidPlayerDecoder, read::DataReaders,
-    timer_decoder::TimerDecoder,
-};
+use super::read::DataReaders;
 
 pub trait BankDecoder: DataReaders {
     fn decode_bank(&mut self) -> Value {
@@ -28,11 +23,12 @@ pub trait BankDecoder: DataReaders {
                 r.read_vector(|r| {
                     let item = r.get_save_map_namedspaced_object();
                     BankItem {
-                        item: item,
+                        item,
                         quantity: r.read_uint32(),
                     }
                     .into_value()
-                }).into()
+                })
+                .into()
             })
             .into(),
         );
