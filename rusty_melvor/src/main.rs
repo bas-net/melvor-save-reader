@@ -19,6 +19,7 @@ use traits::bank_decoder::BankDecoder;
 use traits::base_manager_decoder::BaseManagerDecoder;
 use traits::character_decoder::CharacterDecoder;
 use traits::enemy_decoder::EnemyDecoder;
+use traits::item_charges_decoder::ItemChargesDecoder;
 use traits::minibar_decoder::MinibarDecoder;
 use traits::pet_manager_decoder::PetManagerDecoder;
 use traits::player_decoder::PlayerDecoder;
@@ -28,6 +29,7 @@ use traits::raid_player_decoder::RaidPlayerDecoder;
 use traits::read::{
     Buffer, BufferReader, ByteOffset, DataReaders, HasNumericToStringIdMap,
 };
+use traits::shop_decoder::ShopDecoder;
 use traits::timer_decoder::TimerDecoder;
 
 mod traits;
@@ -183,6 +185,8 @@ impl RaidManagerDecoder for BinaryReader {}
 impl BankDecoder for BinaryReader {}
 impl MinibarDecoder for BinaryReader {}
 impl PetManagerDecoder for BinaryReader {}
+impl ShopDecoder for BinaryReader {}
+impl ItemChargesDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -444,6 +448,10 @@ impl MelvorSaveReader {
         save_reader.add_to_save_map("minibar", |r| r.decode_minibar());
 
         save_reader.add_to_save_map("pets", |r| r.decode_pet_manager());
+
+        save_reader.add_to_save_map("shop", |r| r.decode_shop());
+
+        save_reader.add_to_save_map("item_charges", |r| r.decode_item_charges());
 
         write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
 

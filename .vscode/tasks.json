@@ -70,5 +70,21 @@
 			],
 			"type": "cargo"
 		},
+		{
+			"command": "clippy",
+			"args": [
+				"--fix",
+				"--bin",
+				"'rusty_melvor'"
+			],
+			"label": ": Run cargo clippy --fix",
+			"options": {
+				"cwd": "${workspaceFolder}/rusty_melvor"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"type": "cargo"
+		},
 	]
 }
