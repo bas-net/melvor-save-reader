@@ -13,7 +13,7 @@ pub trait RaidPlayerDecoder: PlayerDecoder {
         map.insert(
             "alt_attacks".into(),
             r.read_value_map_key(
-                |r| match r.get_save_map_namedspaced_object() {
+                |r| match r.read_namespaced_object() {
                     NamespacedObject {
                         text_id: Some(text_id),
                         ..
@@ -22,7 +22,7 @@ pub trait RaidPlayerDecoder: PlayerDecoder {
                 },
                 |r, _| {
                     r.read_vector(|r| -> Value {
-                        r.get_save_map_namedspaced_object().into()
+                        r.read_namespaced_object().into()
                     })
                     .into()
                 },

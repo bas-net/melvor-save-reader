@@ -12,3 +12,6 @@ pub mod raid_player_decoder;
 pub mod read;
 pub mod shop_decoder;
 pub mod timer_decoder;
+pub mod tutorial_decoder;
+pub mod potion_manager_decoder;
+pub mod stat_decoder;

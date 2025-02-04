@@ -31,7 +31,7 @@ pub trait BaseManagerDecoder: DataReaders + TimerDecoder {
         map.insert(
             "passives".into(),
             r.read_vector(|r| -> Value {
-                let passive = r.get_save_map_namedspaced_object();
+                let passive = r.read_namespaced_object();
                 let mut passive_map = Map::new();
                 passive_map.insert("passive".into(), passive.into());
                 passive_map.insert("display".into(), r.read_bool().into());

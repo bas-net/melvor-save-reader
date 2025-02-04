@@ -10,7 +10,7 @@ pub trait PetManagerDecoder: DataReaders {
         map.insert(
             "unlocked".into(),
             r.read_set(|r| -> Value {
-                r.get_save_map_namedspaced_object().into()
+                r.read_namespaced_object().into()
             })
             .into(),
         );

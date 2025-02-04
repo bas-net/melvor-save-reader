@@ -23,6 +23,7 @@ use traits::item_charges_decoder::ItemChargesDecoder;
 use traits::minibar_decoder::MinibarDecoder;
 use traits::pet_manager_decoder::PetManagerDecoder;
 use traits::player_decoder::PlayerDecoder;
+use traits::potion_manager_decoder::PotionManagerDecoder;
 use traits::raid_enemy_decoder::RaidEnemyDecoder;
 use traits::raid_manager_decoder::RaidManagerDecoder;
 use traits::raid_player_decoder::RaidPlayerDecoder;
@@ -30,7 +31,9 @@ use traits::read::{
     Buffer, BufferReader, ByteOffset, DataReaders, HasNumericToStringIdMap,
 };
 use traits::shop_decoder::ShopDecoder;
+use traits::stat_decoder::StatDecoder;
 use traits::timer_decoder::TimerDecoder;
+use traits::tutorial_decoder::TutorialDecoder;
 
 mod traits;
 
@@ -186,6 +189,9 @@ impl MinibarDecoder for BinaryReader {}
 impl PetManagerDecoder for BinaryReader {}
 impl ShopDecoder for BinaryReader {}
 impl ItemChargesDecoder for BinaryReader {}
+impl TutorialDecoder for BinaryReader {}
+impl PotionManagerDecoder for BinaryReader {}
+impl StatDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -205,7 +211,7 @@ impl BinaryReader {
 struct MelvorSaveReader {
     header: BinaryReader,
     raw_data: BinaryReader,
-    save_map: HashMap<String, Value>,
+    save_map: Map<String, Value>,
 }
 
 impl MelvorSaveReader {
@@ -236,7 +242,7 @@ impl MelvorSaveReader {
         let mut save_reader = MelvorSaveReader {
             header,
             raw_data,
-            save_map: HashMap::new(),
+            save_map: Map::new(),
         };
 
         let header_map = save_reader.read_header_map();
@@ -304,7 +310,7 @@ impl MelvorSaveReader {
                 );
                 map.insert(
                     "selected_area".into(),
-                    r.get_save_map_namedspaced_object().into(),
+                    r.read_namespaced_object().into(),
                 );
             }
 
@@ -313,7 +319,7 @@ impl MelvorSaveReader {
             if r.read_bool() {
                 map.insert(
                     "selected_monster".into(),
-                    r.get_save_map_namedspaced_object().into(),
+                    r.read_namespaced_object().into(),
                 );
             }
 
@@ -325,7 +331,7 @@ impl MelvorSaveReader {
                     let mut map = Map::new();
                     map.insert(
                         "item".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                     map.insert("quantity".into(), r.read_uint32().into());
                     map.into()
@@ -341,7 +347,7 @@ impl MelvorSaveReader {
                 if r.read_bool() {
                     map.insert(
                         "monster".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                 }
 
@@ -351,7 +357,7 @@ impl MelvorSaveReader {
                 if r.read_bool() {
                     map.insert(
                         "category".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                 }
 
@@ -361,7 +367,7 @@ impl MelvorSaveReader {
                         let mut map = Map::new();
                         map.insert(
                             "category".into(),
-                            r.get_save_map_namedspaced_object().into(),
+                            r.read_namespaced_object().into(),
                         );
                         map.insert(
                             "tasks_completed".into(),
@@ -375,10 +381,7 @@ impl MelvorSaveReader {
 
                 map.insert("task_timer".into(), read_timer(r));
 
-                map.insert(
-                    "realm".into(),
-                    r.get_save_map_namedspaced_object().into(),
-                );
+                map.insert("realm".into(), r.read_namespaced_object().into());
 
                 map.into()
             });
@@ -386,21 +389,21 @@ impl MelvorSaveReader {
             if r.read_bool() {
                 map.insert(
                     "active_event".into(),
-                    r.get_save_map_namedspaced_object().into(),
+                    r.read_namespaced_object().into(),
                 );
             }
 
             map.insert(
                 "event_passives".into(),
                 r.read_vector(|r| -> Value {
-                    r.get_save_map_namedspaced_object().into()
+                    r.read_namespaced_object().into()
                 })
                 .into(),
             );
 
             map.auto_insert(
                 "event_passives_being_selected",
-                r.read_set(|r| r.get_save_map_namedspaced_object()),
+                r.read_set(|r| r.read_namespaced_object()),
             );
 
             map.auto_insert("event_dungon_length", r.read_uint32());
@@ -408,7 +411,7 @@ impl MelvorSaveReader {
             map.auto_insert(
                 "active_event_areas",
                 r.read_value_map_key(
-                    |r| match r.get_save_map_namedspaced_object() {
+                    |r| match r.read_namespaced_object() {
                         NamespacedObject {
                             text_id: Some(text_id),
                             ..
@@ -424,7 +427,7 @@ impl MelvorSaveReader {
             map.auto_insert(
                 "dungeon_completion",
                 r.read_value_map_key(
-                    |r| match r.get_save_map_namedspaced_object() {
+                    |r| match r.read_namespaced_object() {
                         NamespacedObject {
                             text_id: Some(text_id),
                             ..
@@ -453,7 +456,18 @@ impl MelvorSaveReader {
         save_reader
             .add_to_save_map("item_charges", |r| r.decode_item_charges());
 
-        write_hashmap_to_json(&save_reader.save_map, "save_map.json").unwrap();
+        save_reader.add_to_save_map("tutorial", |r| r.decode_tutorial());
+
+        save_reader
+            .add_to_save_map("potion_manager", |r| r.decode_potion_manager());
+
+        save_reader.add_to_save_map("stats", |r| r.decode_stats());
+
+        write_map_to_json(
+            &save_reader.save_map.clone().into(),
+            "save_map.json",
+        )
+        .unwrap();
 
         Some(save_reader)
     }
@@ -590,6 +604,12 @@ fn open_save() -> Option<()> {
     let _save_reader = MelvorSaveReader::read_save(save.clone());
 
     Some(())
+}
+
+fn write_map_to_json(map: &Value, filename: &str) -> io::Result<()> {
+    let file = File::create(filename)?;
+    to_writer_pretty(file, map)?;
+    Ok(())
 }
 
 fn write_hashmap_to_json<K: serde::Serialize, V: serde::Serialize>(

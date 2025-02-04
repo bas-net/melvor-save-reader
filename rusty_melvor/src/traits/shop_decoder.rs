@@ -11,7 +11,7 @@ pub trait ShopDecoder: DataReaders {
             "upgrades_purchased".into(),
             r.read_value_map_key(
                 |r| {
-                    let item = r.get_save_map_namedspaced_object();
+                    let item = r.read_namespaced_object();
                     match item.text_id {
                         Some(text_id) => text_id,
                         None => item.id.to_string(),

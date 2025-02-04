@@ -24,14 +24,14 @@ pub trait EnemyDecoder: CharacterDecoder {
         if encode_monster && r.read_bool() {
             map.insert(
                 "monster".into(),
-                r.get_save_map_namedspaced_object().into(),
+                r.read_namespaced_object().into(),
             );
         }
 
         if r.read_bool() {
             map.insert(
                 "override_damage_type".into(),
-                r.get_save_map_namedspaced_object().into(),
+                r.read_namespaced_object().into(),
             );
         }
 

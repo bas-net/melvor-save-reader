@@ -125,7 +125,7 @@ pub trait DataReaders: BufferReader + HasNumericToStringIdMap {
         map
     }
 
-    fn get_save_map_namedspaced_object(&mut self) -> NamespacedObject {
+    fn read_namespaced_object(&mut self) -> NamespacedObject {
         let id = self.read_uint16();
         let text_id = self
             .map_numeric_to_string_id(&id)

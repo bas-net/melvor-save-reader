@@ -12,7 +12,7 @@ pub trait MinibarDecoder: DataReaders {
         map.insert(
             "custom_items".into(),
             r.read_value_map_key(
-                |r| match r.get_save_map_namedspaced_object() {
+                |r| match r.read_namespaced_object() {
                     NamespacedObject {
                         text_id: Some(text_id),
                         ..
@@ -21,7 +21,7 @@ pub trait MinibarDecoder: DataReaders {
                 },
                 |r, _| {
                     r.read_vector(|r| -> Value {
-                        r.get_save_map_namedspaced_object().into()
+                        r.read_namespaced_object().into()
                     })
                     .into()
                 },

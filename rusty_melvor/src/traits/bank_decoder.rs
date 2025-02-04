@@ -12,7 +12,7 @@ pub trait BankDecoder: DataReaders {
         map.insert(
             "locked_items".into(),
             r.read_set(|r| -> Value {
-                r.get_save_map_namedspaced_object().into()
+                r.read_namespaced_object().into()
             })
             .into(),
         );
@@ -21,7 +21,7 @@ pub trait BankDecoder: DataReaders {
             "items_by_bank_tab".into(),
             r.read_vector(|r| -> Value {
                 r.read_vector(|r| {
-                    let item = r.get_save_map_namedspaced_object();
+                    let item = r.read_namespaced_object();
                     BankItem {
                         item,
                         quantity: r.read_uint32(),
@@ -37,7 +37,7 @@ pub trait BankDecoder: DataReaders {
             "default_item_tabs".into(),
             r.read_value_map_key(
                 |r| {
-                    let item = r.get_save_map_namedspaced_object();
+                    let item = r.read_namespaced_object();
                     match item.text_id {
                         Some(text_id) => text_id,
                         None => item.id.to_string(),
@@ -57,7 +57,7 @@ pub trait BankDecoder: DataReaders {
         map.insert(
             "custom_sort_order".into(),
             r.read_vector(|r| -> Value {
-                r.get_save_map_namedspaced_object().into()
+                r.read_namespaced_object().into()
             })
             .into(),
         );
@@ -68,7 +68,7 @@ pub trait BankDecoder: DataReaders {
         map.insert(
             "glowing_items".into(),
             r.read_set(|r| -> Value {
-                r.get_save_map_namedspaced_object().into()
+                r.read_namespaced_object().into()
             })
             .into(),
         );
@@ -84,7 +84,7 @@ pub trait BankDecoder: DataReaders {
             "tab_icons".into(),
             r.read_value_map_key(
                 |r| r.read_uint8().to_string(),
-                |r, _| r.get_save_map_namedspaced_object().into(),
+                |r, _| r.read_namespaced_object().into(),
             )
             .into(),
         );

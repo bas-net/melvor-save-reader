@@ -21,7 +21,7 @@ pub trait CharacterDecoder: DataReaders + TimerDecoder {
         map.insert("attack_count".into(), r.read_uint32().into());
         map.insert(
             "next_attack".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
         map.insert("is_attacking".into(), r.read_bool().into());
         map.insert("first_hit".into(), r.read_bool().into());
@@ -35,7 +35,7 @@ pub trait CharacterDecoder: DataReaders + TimerDecoder {
         map.insert(
             "active_effects".into(),
             r.read_value_map_key(
-                |r| match r.get_save_map_namedspaced_object().text_id {
+                |r| match r.read_namespaced_object().text_id {
                     Some(text_id) => text_id,
                     None => "".to_string(),
                 },

@@ -63,7 +63,7 @@ pub trait RaidManagerDecoder:
         map.insert(
             "owned_crate_items".into(),
             r.read_set(|r| -> Value {
-                r.get_save_map_namedspaced_object().into()
+                r.read_namespaced_object().into()
             })
             .into(),
         );
@@ -143,7 +143,7 @@ pub trait RaidManagerDecoder:
                 map.insert(
                     "equipment".into(),
                     r.read_vector(|r| -> Value {
-                        r.get_save_map_namedspaced_object().into()
+                        r.read_namespaced_object().into()
                     })
                     .into(),
                 );
@@ -154,7 +154,7 @@ pub trait RaidManagerDecoder:
                         let mut map = Map::new();
                         map.insert(
                             "item".into(),
-                            r.get_save_map_namedspaced_object().into(),
+                            r.read_namespaced_object().into(),
                         );
                         map.insert("quantity".into(), r.read_uint32().into());
                         map.into()
@@ -165,7 +165,7 @@ pub trait RaidManagerDecoder:
                     let mut map = Map::new();
                     map.insert(
                         "item".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                     map.insert("quantity".into(), r.read_uint32().into());
                     Into::<Value>::into(map)
@@ -190,62 +190,62 @@ fn decode_modifier_values<T: RaidManagerDecoder>(r: &mut T) -> Value {
     let mut map = Map::new();
     map.insert(
         "modifier".into(),
-        r.get_save_map_namedspaced_object().into(),
+        r.read_namespaced_object().into(),
     );
     map.insert("value".into(), r.read_float64().into());
     let scope_key = r.read_uint32();
     map.insert("scope_key".into(), scope_key.into());
 
     if scope_key & ModifierScope::Skill as u32 != 0 {
-        map.insert("skill".into(), r.get_save_map_namedspaced_object().into());
+        map.insert("skill".into(), r.read_namespaced_object().into());
     }
     if scope_key & ModifierScope::DamageType as u32 != 0 {
         map.insert(
             "damage_type".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
     if scope_key & ModifierScope::Realm as u32 != 0 {
-        map.insert("realm".into(), r.get_save_map_namedspaced_object().into());
+        map.insert("realm".into(), r.read_namespaced_object().into());
     }
 
     if scope_key & ModifierScope::Currency as u32 != 0 {
         map.insert(
             "currency".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
     if scope_key & ModifierScope::Category as u32 != 0 {
         map.insert(
             "category".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
     if scope_key & ModifierScope::Action as u32 != 0 {
         map.insert(
             "action".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
     if scope_key & ModifierScope::Subcategory as u32 != 0 {
         map.insert(
             "subcategory".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
     if scope_key & ModifierScope::Item as u32 != 0 {
-        map.insert("item".into(), r.get_save_map_namedspaced_object().into());
+        map.insert("item".into(), r.read_namespaced_object().into());
     }
 
     if scope_key & ModifierScope::EffectGroup as u32 != 0 {
         map.insert(
             "effect_group".into(),
-            r.get_save_map_namedspaced_object().into(),
+            r.read_namespaced_object().into(),
         );
     }
 
@@ -254,7 +254,7 @@ fn decode_modifier_values<T: RaidManagerDecoder>(r: &mut T) -> Value {
 
 fn get_selection<T: RaidManagerDecoder>(r: &mut T) -> Value {
     let mut map = Map::new();
-    map.insert("item".into(), r.get_save_map_namedspaced_object().into());
+    map.insert("item".into(), r.read_namespaced_object().into());
     map.insert("quantity".into(), r.read_uint32().into());
     map.insert("isAlt".into(), r.read_bool().into());
     map.into()

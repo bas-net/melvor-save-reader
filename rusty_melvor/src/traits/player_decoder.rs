@@ -13,21 +13,21 @@ pub trait PlayerDecoder: CharacterDecoder {
         if r.read_bool() {
             map.insert(
                 "melee_style".into(),
-                r.get_save_map_namedspaced_object().into(),
+                r.read_namespaced_object().into(),
             );
         }
         // Ranged
         if r.read_bool() {
             map.insert(
                 "ranged_style".into(),
-                r.get_save_map_namedspaced_object().into(),
+                r.read_namespaced_object().into(),
             );
         }
         // Magic
         if r.read_bool() {
             map.insert(
                 "magic_style".into(),
-                r.get_save_map_namedspaced_object().into(),
+                r.read_namespaced_object().into(),
             );
         }
         map.insert("prayer_points".into(), r.read_uint32().into());
@@ -45,12 +45,12 @@ pub trait PlayerDecoder: CharacterDecoder {
                         let mut map = Map::new();
                         map.insert(
                             "slot".into(),
-                            r.get_save_map_namedspaced_object().into(),
+                            r.read_namespaced_object().into(),
                         );
                         if r.read_bool() {
                             map.insert(
                                 "item".into(),
-                                r.get_save_map_namedspaced_object().into(),
+                                r.read_namespaced_object().into(),
                             );
                             map.insert(
                                 "quantity".into(),
@@ -60,7 +60,7 @@ pub trait PlayerDecoder: CharacterDecoder {
                         map.insert(
                             "quick_equip_items".into(),
                             r.read_vector(|r| -> Value {
-                                r.get_save_map_namedspaced_object().into()
+                                r.read_namespaced_object().into()
                             })
                             .into(),
                         );
@@ -74,19 +74,19 @@ pub trait PlayerDecoder: CharacterDecoder {
                 if r.read_bool() {
                     map.insert(
                         "spell".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                 }
                 if r.read_bool() {
                     map.insert(
                         "aurora".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                 }
                 if r.read_bool() {
                     map.insert(
                         "curse".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                 }
 
@@ -94,7 +94,7 @@ pub trait PlayerDecoder: CharacterDecoder {
                 map.insert(
                     "prayers".into(),
                     r.read_set(|r| -> Value {
-                        r.get_save_map_namedspaced_object().into()
+                        r.read_namespaced_object().into()
                     })
                     .into(),
                 );
@@ -116,7 +116,7 @@ pub trait PlayerDecoder: CharacterDecoder {
                     let mut map = Map::new();
                     map.insert(
                         "item".into(),
-                        r.get_save_map_namedspaced_object().into(),
+                        r.read_namespaced_object().into(),
                     );
                     map.insert("quantity".into(), r.read_uint32().into());
                     map.into()

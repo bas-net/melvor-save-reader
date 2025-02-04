@@ -53,7 +53,7 @@ pub trait RaidEnemyDecoder: EnemyDecoder {
                     map.insert(
                         "passives".into(),
                         r.read_vector(|r| -> Value {
-                            r.get_save_map_namedspaced_object().into()
+                            r.read_namespaced_object().into()
                         })
                         .into(),
                     );
