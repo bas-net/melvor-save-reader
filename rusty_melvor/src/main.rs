@@ -21,6 +21,7 @@ use traits::character_decoder::CharacterDecoder;
 use traits::enemy_decoder::EnemyDecoder;
 use traits::item_charges_decoder::ItemChargesDecoder;
 use traits::minibar_decoder::MinibarDecoder;
+use traits::native_manager_decoder::NativeManagerDecoder;
 use traits::pet_manager_decoder::PetManagerDecoder;
 use traits::player_decoder::PlayerDecoder;
 use traits::potion_manager_decoder::PotionManagerDecoder;
@@ -30,7 +31,9 @@ use traits::raid_player_decoder::RaidPlayerDecoder;
 use traits::read::{
     Buffer, BufferReader, ByteOffset, DataReaders, HasNumericToStringIdMap,
 };
+use traits::settings_decoder::SettingsDecoder;
 use traits::shop_decoder::ShopDecoder;
+use traits::skill_decoder::SkillDecoder;
 use traits::stat_decoder::StatDecoder;
 use traits::timer_decoder::TimerDecoder;
 use traits::tutorial_decoder::TutorialDecoder;
@@ -62,10 +65,19 @@ where
     }
 }
 
-#[derive(PartialEq, Hash)]
+#[derive(PartialEq, Hash, Debug)]
 struct NamespacedObject {
     id: u16,
     text_id: Option<String>,
+}
+
+impl NamespacedObject {
+    fn as_name(&self) -> String {
+        match &self.text_id {
+            Some(text_id) => text_id.clone(),
+            None => self.id.to_string(),
+        }
+    }
 }
 
 impl From<NamespacedObject> for Value {
@@ -192,6 +204,9 @@ impl ItemChargesDecoder for BinaryReader {}
 impl TutorialDecoder for BinaryReader {}
 impl PotionManagerDecoder for BinaryReader {}
 impl StatDecoder for BinaryReader {}
+impl SettingsDecoder for BinaryReader {}
+impl NativeManagerDecoder for BinaryReader {}
+impl SkillDecoder for BinaryReader {}
 
 impl BinaryReader {
     fn validate_file_is_melvor_save(&mut self) -> bool {
@@ -463,6 +478,20 @@ impl MelvorSaveReader {
 
         save_reader.add_to_save_map("stats", |r| r.decode_stats());
 
+        save_reader.add_to_save_map("settings", |r| r.decode_settings());
+
+        save_reader.add_to_save_map("read_news_i_ds", |r| {
+            r.read_vector(|r| -> Value { r.read_string().into() })
+        });
+
+        save_reader
+            .add_to_save_map("last_loaded_game_version", |r| r.read_string());
+
+        save_reader
+            .add_to_save_map("native_manager", |r| r.decode_native_manager());
+
+        save_reader.add_to_save_map("skills", |r| r.decode_skills());
+
         write_map_to_json(
             &save_reader.save_map.clone().into(),
             "save_map.json",
@@ -572,7 +601,7 @@ impl MelvorSaveReader {
 
 fn open_save() -> Option<()> {
     // Open file save.txt
-    let save = match std::fs::read_to_string("save3.txt") {
+    let save = match std::fs::read_to_string("save5.txt") {
         Ok(content) => content,
         Err(e) => {
             println!("Failed to read save.txt: {}", e);

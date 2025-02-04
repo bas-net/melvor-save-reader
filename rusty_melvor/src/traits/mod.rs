@@ -15,3 +15,6 @@ pub mod timer_decoder;
 pub mod tutorial_decoder;
 pub mod potion_manager_decoder;
 pub mod stat_decoder;
+pub mod settings_decoder;
+pub mod native_manager_decoder;
+pub mod skill_decoder;
